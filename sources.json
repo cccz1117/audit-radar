@@ -1,0 +1,84 @@
+{
+  "sources": [
+    {
+      "name": "nvd-high",
+      "type": "api",
+      "category": "regulatory",
+      "url": "https://services.nvd.nist.gov/rest/json/cves/2.0?cvssV4Severity=HIGH&resultsPerPage=10",
+      "weight": 10,
+      "enabled": true
+    },
+    {
+      "name": "nvd-critical",
+      "type": "api",
+      "category": "regulatory",
+      "url": "https://services.nvd.nist.gov/rest/json/cves/2.0?cvssV4Severity=CRITICAL&resultsPerPage=10",
+      "weight": 10,
+      "enabled": true
+    },
+    {
+      "name": "机器之心",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://www.jiqizhixin.com/rss",
+      "weight": 8,
+      "enabled": true
+    },
+    {
+      "name": "量子位",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://www.qbitai.com/rss",
+      "weight": 8,
+      "enabled": true
+    },
+    {
+      "name": "Risk.net",
+      "type": "rss",
+      "category": "regulatory",
+      "url": "https://www.risk.net/rss",
+      "weight": 9,
+      "enabled": true
+    },
+    {
+      "name": "Finextra",
+      "type": "rss",
+      "category": "regulatory",
+      "url": "https://www.finextra.com/rss",
+      "weight": 8,
+      "enabled": true
+    },
+    {
+      "name": "DataCenterDynamics",
+      "type": "rss",
+      "category": "geopolitical",
+      "url": "https://www.datacenterdynamics.com/rss",
+      "weight": 7,
+      "enabled": true
+    },
+    {
+      "name": "MIT Tech Review",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://www.technologyreview.com/feed/",
+      "weight": 7,
+      "enabled": true
+    },
+    {
+      "name": "HuggingFace Papers",
+      "type": "api",
+      "category": "papers",
+      "url": "https://huggingface.co/api/daily-papers",
+      "weight": 6,
+      "enabled": true
+    },
+    {
+      "name": "Lobsters",
+      "type": "rss",
+      "category": "geopolitical",
+      "url": "https://lobste.rs/rss",
+      "weight": 6,
+      "enabled": true
+    }
+  ]
+}
