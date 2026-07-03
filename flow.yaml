@@ -24,40 +24,15 @@ pipeline:
       temperature: 0.3
       max_tokens: 8192
 
-    # ========== 3. 条件分支：候选不足则补充采集 ==========
-    - id: check_coverage
-      type: condition
-      if: "len(${screen}) < 15"
-      then:
-        - id: supplement_fetch
-          type: code
-          module: core.fetcher
-          function: Fetcher.fetch_supplement
-          input: []
-        - id: merge
-          type: code
-          module: core.utils
-          function: merge_candidates
-          input:
-            - ${fetch}
-            - ${supplement_fetch}
-          spread: true
-      else:
-        - id: pass_through
-          type: code
-          module: core.utils
-          function: identity
-          input: ${screen}
-
-    # ========== 4. 共振 ==========
+    # ========== 3. 共振 ==========
     - id: resonance
       type: code
       module: core.resonance
       function: ResonanceDetector.detect
-      input: ${check_coverage}
+      input: ${screen}
       output: clusters
 
-    # ========== 5. 精排（用推理模型，输出思维链） ==========
+    # ========== 4. 精排（用推理模型，输出思维链） ==========
     - id: rank
       type: llm
       model: deepseek-r1
@@ -69,7 +44,7 @@ pipeline:
       temperature: 0.3
       max_tokens: 8192
 
-    # ========== 6. 生成 ==========
+    # ========== 5. 生成 ==========
     - id: generate
       type: llm
       model: deepseek-v4
@@ -84,7 +59,7 @@ pipeline:
       temperature: 0.5
       max_tokens: 8192
 
-    # ========== 7. 发送 ==========
+    # ========== 6. 发送 ==========
     - id: send
       type: code
       module: core.sender
