@@ -49,10 +49,10 @@
       "enabled": true
     },
     {
-      "name": "DataCenterDynamics",
+      "name": "Cisco",
       "type": "rss",
-      "category": "geopolitical",
-      "url": "https://www.datacenterdynamics.com/rss",
+      "category": "papers",
+      "url": "https://blogs.cisco.com/datacenter/feed",
       "weight": 7,
       "enabled": true
     },
@@ -77,7 +77,7 @@
       "type": "rss",
       "category": "geopolitical",
       "url": "https://lobste.rs/rss",
-      "weight": 6,
+      "weight": 4,
       "enabled": true
     }
   ]
