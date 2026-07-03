@@ -68,7 +68,7 @@
       "name": "HuggingFace Papers",
       "type": "api",
       "category": "papers",
-      "url": "https://huggingface.co/api/daily-papers",
+      "url": "https://raw.githubusercontent.com/huangboming/huggingface-daily-paper-feed/main/feed.xml",
       "weight": 6,
       "enabled": true
     },
