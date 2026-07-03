@@ -63,7 +63,7 @@ class Ranker:
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            print(f"  ⚠️ Ranker JSON parse failed, fallback")
+            print(f"  [WARN] Ranker JSON parse failed, fallback")
             # fallback：取前3条
             top3 = candidates[:3]
             return {

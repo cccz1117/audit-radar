@@ -34,9 +34,9 @@ class Fetcher:
                     item["category"] = src.get("category", "general")
                     item["weight"] = src.get("weight", 5)
                 candidates.extend(items)
-                print(f"  📡 {src['name']}: {len(items)} items")
+                print(f"  [NET] {src['name']}: {len(items)} items")
             except Exception as e:
-                print(f"  ⚠️ {src['name']} failed: {e}")
+                print(f"  [WARN] {src['name']} failed: {e}")
         return candidates
 
     def _fetch_api(self, src: Dict) -> List[Dict]:

@@ -17,18 +17,18 @@ def handler(event, context):
     print("=" * 50)
 
     # 1. 采集
-    print("\n📡 1. 采集信源...")
+    print("\n[NET] 1. 采集信源...")
     fetcher = Fetcher()
     candidates = fetcher.fetch_all()
     print(f"   总计候选: {len(candidates)} 条")
 
     # 2. 粗筛
-    print("\n🧹 2. 粗筛（rss-audit-screener）...")
+    print("\n[FILTER] 2. 粗筛（rss-audit-screener）...")
     selector = Selector()
     screened = selector.screen(candidates)
 
     # 3. 共振
-    print("\n🌐 3. 多源共振检测...")
+    print("\n[RESONANCE] 3. 多源共振检测...")
     detector = ResonanceDetector()
     clusters = detector.detect(screened)
     print(f"   事件簇: {len(clusters)} 个")
@@ -36,7 +36,7 @@ def handler(event, context):
         print(f"   • {c['event_title'][:50]}... | 共振:{c['resonance_score']} | 等级:{c['level']}")
 
     # 4. 精排
-    print("\n📊 4. 精排（audit-news-ranker）...")
+    print("\n[RANK] 4. 精排（audit-news-ranker）...")
     ranker = Ranker()
     result = ranker.rank(clusters)
     top3 = result.get("top3", [])
@@ -45,17 +45,17 @@ def handler(event, context):
         print(f"   • [{t.get('line','')}] {t.get('title','')}")
 
     # 5. 生成
-    print("\n📝 5. 生成日报...")
+    print("\n[GEN] 5. 生成日报...")
     generator = Generator()
     html = generator.generate(top3, clusters)
     print(f"   HTML 长度: {len(html)} chars")
 
     # 6. 发送
-    print("\n📧 6. 发送邮件...")
+    print("\n[MAIL] 6. 发送邮件...")
     sender = Sender()
     sender.send(html, subject="AI审计智能日报")
 
-    print("\n✅ Audit Radar 完成")
+    print("\n[OK] Audit Radar 完成")
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},

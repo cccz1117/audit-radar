@@ -29,10 +29,10 @@ class FlowEngine:
 
         for node in nodes:
             nid = node["id"]
-            print(f"\n▶️ [{nid}] 类型:{node['type']}")
+            print(f"\n>> [{nid}] 类型:{node['type']}")
             result = self._execute(node)
             self.context[nid] = result
-            print(f"   ✅ 完成 → 输出存入 context['{nid}']")
+            print(f"   [OK] 完成 → 输出存入 context['{nid}']")
 
         return self.context
 

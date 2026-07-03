@@ -13,7 +13,7 @@ class Sender:
 
     def send(self, html_body: str, subject: str = "AI审计日报"):
         if not config.MAIL_HOST or not config.MAIL_USER:
-            print("  ⚠️ 邮件未配置，仅打印")
+            print("  [WARN] 邮件未配置，仅打印")
             print(f"  Subject: {subject}")
             print(f"  Body: {html_body[:500]}...")
             return
@@ -33,4 +33,4 @@ class Sender:
             server.sendmail(
                 config.MAIL_FROM, config.MAIL_TO_LIST, msg.as_string()
             )
-        print(f"  📧 邮件已发送: {subject}")
+        print(f"  [MAIL] 邮件已发送: {subject}")

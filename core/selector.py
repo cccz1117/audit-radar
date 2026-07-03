@@ -71,7 +71,7 @@ class Selector:
             results = json.loads(text)
         except json.JSONDecodeError:
             # fallback：逐行提取 keep=yes/strong 的
-            print(f"  ⚠️ JSON parse failed, fallback to text scan")
+            print(f"  [WARN] JSON parse failed, fallback to text scan")
             return candidates  # 保守：全部保留
         kept = []
         for r in results:
@@ -84,5 +84,5 @@ class Selector:
                         c["total_score"] = r.get("total_score", 0)
                         kept.append(c)
                         break
-        print(f"  ✅ 粗筛保留: {len(kept)} / {len(candidates)}")
+        print(f"  [OK] 粗筛保留: {len(kept)} / {len(candidates)}")
         return kept
