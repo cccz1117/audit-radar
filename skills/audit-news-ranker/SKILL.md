@@ -1,6 +1,40 @@
 ---
 name: audit-news-ranker
 description: 审计新闻精排器。对已通过粗筛的候选新闻进行精细排序，选出每日最值得报道的Top 3（或Top 8给领导排序）。基于审计价值而非通用热度排序。
+entrypoint: core.ranker:Ranker.rank
+input_schema:
+  type: array
+  items:
+    type: object
+    properties:
+      event_title: {type: string}
+      sources: {type: array, items: {type: string}}
+      categories: {type: array, items: {type: string}}
+      resonance_score: {type: number}
+      level: {type: string}
+output_schema:
+  type: object
+  properties:
+    top3:
+      type: array
+      items:
+        type: object
+        properties:
+          rank: {type: number}
+          line: {type: string}
+          title: {type: string}
+          source: {type: string}
+          reason: {type: string}
+          audit_value: {type: string}
+    top8:
+      type: array
+      items:
+        type: object
+    dropped:
+      type: array
+      items:
+        type: object
+    summary: {type: string}
 triggers:
   - "排序新闻"
   - "精排"

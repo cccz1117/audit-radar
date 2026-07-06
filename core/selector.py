@@ -6,14 +6,14 @@ from typing import List, Dict
 import requests
 
 import config
+from core.skill_loader import load_skill_prompt
 
 
 class Selector:
     """审计新闻粗筛器。"""
 
     def __init__(self):
-        with open(config.PROMPTS_DIR + "/selector_system.txt", "r", encoding="utf-8") as f:
-            self.system_prompt = f.read()
+        self.system_prompt = load_skill_prompt("rss-audit-screener")
 
     def screen(self, candidates: List[Dict]) -> List[Dict]:
         """输入候选池，返回 keep=strong/yes 的条目。"""

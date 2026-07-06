@@ -6,14 +6,14 @@ from typing import List, Dict
 import requests
 
 import config
+from core.skill_loader import load_skill_prompt
 
 
 class Ranker:
     """审计新闻精排器。"""
 
     def __init__(self):
-        with open(config.PROMPTS_DIR + "/ranker_system.txt", "r", encoding="utf-8") as f:
-            self.system_prompt = f.read()
+        self.system_prompt = load_skill_prompt("audit-news-ranker")
 
     def rank(self, candidates: List[Dict]) -> Dict:
         """输入共振后的候选，返回 Top3 + Top8 + summary。"""

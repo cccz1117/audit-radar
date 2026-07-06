@@ -1,6 +1,22 @@
 ---
 name: cross-source-resonance
 description: 多源共振检测器。判断同一事件是否在多个独立信源中出现，以此验证新闻的"重要性"和"可信度"。单源消息可能是噪音或谣言，多源共振才是真实信号。
+entrypoint: core.resonance:ResonanceDetector.detect
+input_schema:
+  type: array
+  items:
+    type: object
+output_schema:
+  type: array
+  items:
+    type: object
+    properties:
+      event_title: {type: string}
+      items: {type: array}
+      sources: {type: array, items: {type: string}}
+      categories: {type: array, items: {type: string}}
+      resonance_score: {type: number}
+      level: {type: string}
 triggers:
   - "共振检测"
   - "多源共振"

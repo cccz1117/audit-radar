@@ -1,6 +1,36 @@
 ---
 name: rss-audit-screener
 description: 银行信息科技审计视角的RSS新闻粗筛器。用于从多源RSS候选池中快速判断单条新闻是否值得进入审计日报。不判断排序，只判断"留"或"扔"。
+entrypoint: core.selector:Selector.screen
+input_schema:
+  type: array
+  items:
+    type: object
+    properties:
+      title: {type: string}
+      source: {type: string}
+      summary: {type: string}
+      link: {type: string}
+output_schema:
+  type: array
+  items:
+    type: object
+    properties:
+      title: {type: string}
+      source: {type: string}
+      keep: {type: string, enum: [strong, yes, no]}
+      total_score: {type: number}
+      dimension_scores:
+        type: object
+        properties:
+          A: {type: number}
+          B: {type: number}
+          C: {type: number}
+          D: {type: number}
+          E: {type: number}
+      category: {type: string}
+      reason: {type: string}
+      audit_mapping_guess: {type: string}
 triggers:
   - "筛选rss"
   - "筛选新闻"

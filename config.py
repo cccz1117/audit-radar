@@ -23,7 +23,6 @@ MAIL_TO_LIST = os.getenv("MAIL_TO_LIST", "").split(",")  # 逗号分隔
 MAIL_FROM = os.getenv("MAIL_FROM", MAIL_USER)
 
 # -- 路径 --
-PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 SOURCES_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
 
 # -- 调试 --

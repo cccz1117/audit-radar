@@ -6,14 +6,14 @@ from typing import Dict, List
 import requests
 
 import config
+from core.skill_loader import load_skill_prompt
 
 
 class Generator:
     """日报生成器。"""
 
     def __init__(self):
-        with open(config.PROMPTS_DIR + "/generator_system.txt", "r", encoding="utf-8") as f:
-            self.system_prompt = f.read()
+        self.system_prompt = load_skill_prompt("report-generator")
 
     def generate(self, top3: List[Dict], clusters: List[Dict]) -> str:
         """输入 Top3 新闻 + 完整事件簇，生成 HTML 日报。"""

@@ -95,16 +95,6 @@ CREATE TABLE IF NOT EXISTS source_status (
     UNIQUE(date, source)
 );
 
--- 标题变更追踪
-CREATE TABLE IF NOT EXISTS title_changes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url_hash TEXT NOT NULL,
-    first_seen_date TEXT NOT NULL,
-    changed_at TEXT NOT NULL,
-    old_title TEXT,
-    new_title TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_title_changes_hash ON title_changes(url_hash);
 """
 
 
