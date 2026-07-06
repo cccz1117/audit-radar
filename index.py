@@ -93,12 +93,15 @@ def handler(event, context):
     # 1.6 标记 GitHub repo 新增性
     _mark_github_repos(fresh_candidates, storage, today)
 
-    # 2. 粗筛
+    # 2. 粗筛（日报 + 深度池分离）
     _skill_log("FILTER", "rss-audit-screener")
     selector = Selector()
-    screened = selector.screen(fresh_candidates)
-    print(f"   保留: {len(screened)} 条")
+    screened, deep_dive_candidates = selector.screen(fresh_candidates)
+    print(f"   日报保留: {len(screened)} 条 | 深度池候选: {len(deep_dive_candidates)} 条")
     storage.save_screened(today, screened)
+    if deep_dive_candidates:
+        storage.save_deep_dive_candidates(today, deep_dive_candidates)
+        print(f"   已保存 {len(deep_dive_candidates)} 条到深度挖掘队列")
 
     # 2.5 内容相似度跨天去重（Jaccard + 可选 AI）
     past_items = storage.get_recent_report_items(days=7)
@@ -188,6 +191,7 @@ def handler(event, context):
             "url_filtered": len(url_filtered),
             "fresh_candidates": len(fresh_candidates),
             "screened": len(screened),
+            "deep_dive_candidates": len(deep_dive_candidates),
             "deduped_screened": len(deduped_screened),
             "clusters": len(clusters),
             "top3": len(top3),

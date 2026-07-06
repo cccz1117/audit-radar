@@ -81,6 +81,36 @@
       "enabled": true
     },
     {
+      "name": "晚点聊 LateTalk",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://feeds.fireside.fm/latetalk/rss",
+      "weight": 8,
+      "report_cycle": "weekly",
+      "content_type": "podcast",
+      "enabled": true
+    },
+    {
+      "name": "张小珺Jùn｜商业访谈录",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://feed.xyzfm.space/dk4yh3pkpjp3",
+      "weight": 8,
+      "report_cycle": "weekly",
+      "content_type": "podcast",
+      "enabled": true
+    },
+    {
+      "name": "厚雪长波",
+      "type": "rss",
+      "category": "regulatory",
+      "url": "https://proxy.wavpub.com/snowball.xml",
+      "weight": 7,
+      "report_cycle": "weekly",
+      "content_type": "podcast",
+      "enabled": true
+    },
+    {
       "name": "财联社电报",
       "type": "newsnow",
       "source_id": "cls-telegraph",

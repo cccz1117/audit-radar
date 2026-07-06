@@ -36,6 +36,8 @@ class Fetcher:
                     item["source"] = src["name"]
                     item["category"] = src.get("category", "general")
                     item["weight"] = src.get("weight", 5)
+                    item["report_cycle"] = src.get("report_cycle", "daily")
+                    item["content_type"] = src.get("content_type", "article")
                 candidates.extend(items)
                 print(f"  [NET] {src['name']}: {len(items)} items")
             except Exception as e:
@@ -120,11 +122,16 @@ class Fetcher:
             link = entry.find("link")
             pub_date = entry.find("pubDate")
             desc = entry.find("description")
+            enclosure = entry.find("enclosure")
+            audio_url = ""
+            if enclosure is not None:
+                audio_url = enclosure.get("url") or ""
             items.append({
                 "title": title.text if title is not None else "",
                 "date": pub_date.text if pub_date is not None else "",
                 "summary": self._strip_html(desc.text if desc is not None else ""),
                 "link": link.text if link is not None else "",
+                "audio_url": audio_url,
                 "raw_score": 0,
             })
             if len(items) >= config.RSS_MAX_ITEMS:
@@ -137,11 +144,17 @@ class Fetcher:
                 link = entry.find("atom:link", ns)
                 updated = entry.find("atom:updated", ns)
                 summary = entry.find("atom:summary", ns)
+                audio_url = ""
+                for lnk in entry.findall("atom:link", ns):
+                    if lnk.get("rel") == "enclosure":
+                        audio_url = lnk.get("href") or ""
+                        break
                 items.append({
                     "title": title.text if title is not None else "",
                     "date": updated.text if updated is not None else "",
                     "summary": self._strip_html(summary.text if summary is not None else ""),
                     "link": link.get("href") if link is not None else "",
+                    "audio_url": audio_url,
                     "raw_score": 0,
                 })
                 if len(items) >= config.RSS_MAX_ITEMS:
@@ -201,4 +214,9 @@ class Fetcher:
     @staticmethod
     def _strip_html(raw: str) -> str:
         import re
-        return re.sub(r"<[^>]+>", "", raw).strip()
+        import html
+
+        if not raw:
+            return ""
+        text = re.sub(r"<[^>]+>", "", raw)
+        return html.unescape(text).strip()

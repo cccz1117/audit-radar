@@ -114,6 +114,41 @@ CREATE TABLE IF NOT EXISTS repo_history (
     max_stars INTEGER DEFAULT 0
 );
 
+-- 深度挖掘候选池（播客/长博客等，用于周报/月报）
+CREATE TABLE IF NOT EXISTS deep_dive_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    url_hash TEXT UNIQUE,
+    title TEXT NOT NULL,
+    source TEXT NOT NULL,
+    summary TEXT,
+    link TEXT,
+    report_cycle TEXT NOT NULL DEFAULT 'weekly',
+    content_type TEXT NOT NULL DEFAULT 'podcast',
+    audio_url TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    reason TEXT,
+    audit_mapping_guess TEXT,
+    metadata TEXT,
+    week_id TEXT,
+    created_at TEXT NOT NULL,
+    processed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_deep_dive_date ON deep_dive_queue(date);
+CREATE INDEX IF NOT EXISTS idx_deep_dive_status ON deep_dive_queue(status);
+CREATE INDEX IF NOT EXISTS idx_deep_dive_cycle ON deep_dive_queue(report_cycle);
+CREATE INDEX IF NOT EXISTS idx_deep_dive_week ON deep_dive_queue(week_id);
+
+-- 周报
+CREATE TABLE IF NOT EXISTS weekly_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    topics TEXT NOT NULL,
+    html TEXT NOT NULL,
+    status TEXT DEFAULT 'draft'
+);
+
 """
 
 
@@ -466,3 +501,155 @@ class SQLiteBackend(StorageBackend):
                     (url_hash, repo_name, date, date, stars),
                 )
             conn.commit()
+
+    def save_deep_dive_candidates(self, date: str, candidates: List[Dict]) -> None:
+        """保存深度挖掘候选。相同 URL 不重复插入。"""
+        with self._conn() as conn:
+            for c in candidates:
+                link = c.get("link", "") or ""
+                url_hash = self._url_hash(link)
+                if not url_hash:
+                    continue
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO deep_dive_queue
+                        (date, url_hash, title, source, summary, link, report_cycle,
+                         content_type, audio_url, status, reason, audit_mapping_guess,
+                         metadata, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(url_hash) DO NOTHING
+                        """,
+                        (
+                            date,
+                            url_hash,
+                            c.get("title", ""),
+                            c.get("source", ""),
+                            c.get("summary", ""),
+                            link,
+                            c.get("report_cycle", "weekly"),
+                            c.get("content_type", "podcast"),
+                            c.get("audio_url", ""),
+                            c.get("status", "pending"),
+                            c.get("deep_dive_reason", ""),
+                            c.get("audit_mapping_guess", ""),
+                            json.dumps(c.get("metadata", {}), ensure_ascii=False),
+                            self._now(),
+                        ),
+                    )
+                except sqlite3.IntegrityError:
+                    pass
+            conn.commit()
+
+    def get_deep_dive_candidates(
+        self,
+        report_cycle: str = "weekly",
+        week_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[Dict]:
+        """读取深度挖掘候选。"""
+        conditions = ["report_cycle = ?"]
+        params: List[Optional[str]] = [report_cycle]
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+        else:
+            conditions.append("status IN ('pending', 'processed')")
+        if week_id:
+            conditions.append("week_id = ?")
+            params.append(week_id)
+
+        where_clause = " AND ".join(conditions)
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT date, url_hash, title, source, summary, link, report_cycle,
+                       content_type, audio_url, status, reason, audit_mapping_guess,
+                       metadata, week_id
+                FROM deep_dive_queue
+                WHERE {where_clause}
+                ORDER BY date DESC, source
+                """,
+                tuple(params),
+            ).fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "date": r[0],
+                "url_hash": r[1],
+                "title": r[2],
+                "source": r[3],
+                "summary": r[4],
+                "link": r[5],
+                "report_cycle": r[6],
+                "content_type": r[7],
+                "audio_url": r[8],
+                "status": r[9],
+                "deep_dive_reason": r[10],
+                "audit_mapping_guess": r[11],
+                "metadata": json.loads(r[12]) if r[12] else {},
+                "week_id": r[13],
+            })
+        return result
+
+    def update_deep_dive_status(
+        self,
+        url_hashes: List[str],
+        status: str,
+        week_id: Optional[str] = None,
+    ) -> None:
+        """批量更新深度挖掘候选状态。"""
+        if not url_hashes:
+            return
+        placeholders = ",".join("?" * len(url_hashes))
+        params: List[Optional[str]] = [status, self._now()]
+        if week_id:
+            params.append(week_id)
+        params.extend(url_hashes)
+        set_week = ", week_id = ?" if week_id else ""
+        with self._conn() as conn:
+            conn.execute(
+                f"""
+                UPDATE deep_dive_queue
+                SET status = ?, processed_at = ?{set_week}
+                WHERE url_hash IN ({placeholders})
+                """,
+                tuple(params),
+            )
+            conn.commit()
+
+    def save_weekly_report(self, week_id: str, report: Dict) -> None:
+        """保存周报。"""
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO weekly_reports
+                (week_id, created_at, topics, html, status)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    week_id,
+                    self._now(),
+                    json.dumps(report.get("topics", []), ensure_ascii=False),
+                    report.get("html", ""),
+                    report.get("status", "draft"),
+                ),
+            )
+            conn.commit()
+
+    def get_weekly_report(self, week_id: str) -> Optional[Dict]:
+        """读取周报。"""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT created_at, topics, html, status FROM weekly_reports WHERE week_id = ?",
+                (week_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "week_id": week_id,
+            "created_at": row[0],
+            "topics": json.loads(row[1]) if row[1] else [],
+            "html": row[2],
+            "status": row[3],
+        }

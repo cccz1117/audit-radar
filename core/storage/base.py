@@ -77,3 +77,33 @@ class StorageBackend(ABC):
     @abstractmethod
     def update_repo_history(self, date: str, repos: List[Dict]) -> None:
         """更新 GitHub repo 历史。"""
+
+    @abstractmethod
+    def save_deep_dive_candidates(self, date: str, candidates: List[Dict]) -> None:
+        """保存深度挖掘候选（周报/月报池）。"""
+
+    @abstractmethod
+    def get_deep_dive_candidates(
+        self,
+        report_cycle: str = "weekly",
+        week_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[Dict]:
+        """读取深度挖掘候选池。"""
+
+    @abstractmethod
+    def update_deep_dive_status(
+        self,
+        url_hashes: List[str],
+        status: str,
+        week_id: Optional[str] = None,
+    ) -> None:
+        """批量更新深度挖掘候选状态。"""
+
+    @abstractmethod
+    def save_weekly_report(self, week_id: str, report: Dict) -> None:
+        """保存周报。"""
+
+    @abstractmethod
+    def get_weekly_report(self, week_id: str) -> Optional[Dict]:
+        """读取周报。"""
