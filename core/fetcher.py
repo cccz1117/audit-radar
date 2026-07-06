@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""信源采集器：NVD + RSS + HuggingFace Daily Papers。"""
+"""信源采集器：NVD + RSS + NewsNow + HuggingFace Daily Papers。"""
 import json
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from typing import List, Dict
 
 import requests
@@ -27,6 +28,8 @@ class Fetcher:
                     items = self._fetch_api(src)
                 elif src["type"] == "rss":
                     items = self._fetch_rss(src)
+                elif src["type"] == "newsnow":
+                    items = self._fetch_newsnow(src)
                 else:
                     continue
                 for item in items:
@@ -143,6 +146,56 @@ class Fetcher:
                 })
                 if len(items) >= config.RSS_MAX_ITEMS:
                     break
+        return items
+
+    def _fetch_newsnow(self, src: Dict) -> List[Dict]:
+        """NewsNow API 信源。"""
+        source_id = src["source_id"]
+        url = f"https://newsnow.busiyi.world/api/s?id={source_id}&latest"
+        resp = requests.get(
+            url,
+            timeout=config.REQUEST_TIMEOUT,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        items = []
+        for item in data.get("items", [])[: config.RSS_MAX_ITEMS]:
+            pub_date_ms = item.get("pubDate")
+            date_str = ""
+            if pub_date_ms:
+                try:
+                    dt = datetime.fromtimestamp(pub_date_ms / 1000, tz=timezone.utc)
+                    date_str = dt.isoformat()
+                except Exception:
+                    date_str = str(pub_date_ms)
+            extra = item.get("extra") or {}
+            summary = extra.get("hover", "")
+            title = item.get("title", "").strip()
+            if not summary:
+                summary = title  # hover 为空时，用标题作为摘要兜底
+
+            # 解析 GitHub repo 的 star 数（如 "✰ 17,507"）
+            stars = 0
+            info = extra.get("info", "")
+            if info and "✰" in info:
+                try:
+                    stars = int(info.replace("✰", "").replace(",", "").strip())
+                except ValueError:
+                    stars = 0
+
+            items.append({
+                "title": title,
+                "date": date_str,
+                "summary": summary,
+                "link": item.get("url", ""),
+                "raw_score": 0,
+                "source_type": "newsnow",
+                "stars": stars,
+            })
         return items
 
     @staticmethod

@@ -95,6 +95,25 @@ CREATE TABLE IF NOT EXISTS source_status (
     UNIQUE(date, source)
 );
 
+-- 已报道 URL（用于跨天去重）
+CREATE TABLE IF NOT EXISTS reported_urls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    url_hash TEXT NOT NULL,
+    title TEXT,
+    UNIQUE(date, url_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_reported_urls_hash ON reported_urls(url_hash);
+
+-- GitHub repo 历史（用于判断是否为新增 repo）
+CREATE TABLE IF NOT EXISTS repo_history (
+    url_hash TEXT PRIMARY KEY,
+    repo_name TEXT,
+    first_seen_date TEXT NOT NULL,
+    last_seen_date TEXT NOT NULL,
+    max_stars INTEGER DEFAULT 0
+);
+
 """
 
 
@@ -335,4 +354,115 @@ class SQLiteBackend(StorageBackend):
                 """,
                 (date, source, self._now(), count, status, error),
             )
+            conn.commit()
+
+    def save_reported_urls(self, date: str, items: List[Dict]) -> None:
+        """保存某日最终入选报道的 URL。"""
+        with self._conn() as conn:
+            for item in items:
+                link = item.get("link", "") or ""
+                if not link:
+                    continue
+                url_hash = self._url_hash(link)
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO reported_urls (date, url_hash, title)
+                        VALUES (?, ?, ?)
+                        """,
+                        (date, url_hash, item.get("title", "")),
+                    )
+                except sqlite3.IntegrityError:
+                    pass
+            conn.commit()
+
+    def is_recently_reported(self, url_hash: str, days: int = 7) -> bool:
+        """查询 URL 最近 N 天是否已被报道。"""
+        if not url_hash:
+            return False
+        from datetime import datetime, timedelta
+
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT 1 FROM reported_urls
+                WHERE url_hash = ? AND date >= ?
+                """,
+                (url_hash, cutoff),
+            ).fetchone()
+        return bool(row)
+
+    def get_recent_report_items(self, days: int = 7) -> List[Dict]:
+        """获取最近 N 天已报道的新闻标题和摘要，用于内容相似度去重。"""
+        from datetime import datetime, timedelta
+
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT date, top3, summary FROM reports
+                WHERE date >= ?
+                ORDER BY date DESC
+                """,
+                (cutoff,),
+            ).fetchall()
+
+        items = []
+        for date, top3_raw, summary in rows:
+            top3 = json.loads(top3_raw) if top3_raw else []
+            for t in top3:
+                items.append(
+                    {
+                        "date": date,
+                        "title": t.get("title", ""),
+                        "summary": "",
+                        "line": t.get("line", ""),
+                    }
+                )
+        return items
+
+    def get_repo_history(self, url_hashes: List[str]) -> Dict[str, Dict]:
+        """批量查询 repo 历史。返回 {url_hash: {...}}。"""
+        if not url_hashes:
+            return {}
+        placeholders = ",".join("?" * len(url_hashes))
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT url_hash, repo_name, first_seen_date, last_seen_date, max_stars
+                FROM repo_history
+                WHERE url_hash IN ({placeholders})
+                """,
+                tuple(url_hashes),
+            ).fetchall()
+        return {
+            r[0]: {
+                "repo_name": r[1],
+                "first_seen_date": r[2],
+                "last_seen_date": r[3],
+                "max_stars": r[4],
+            }
+            for r in rows
+        }
+
+    def update_repo_history(self, date: str, repos: List[Dict]) -> None:
+        """更新 GitHub repo 历史。新增 repo 插入，已存在则更新最后出现时间和最大 star。"""
+        with self._conn() as conn:
+            for repo in repos:
+                url_hash = self._url_hash(repo.get("link", ""))
+                if not url_hash:
+                    continue
+                repo_name = repo.get("title", "")
+                stars = int(repo.get("stars", 0) or 0)
+                conn.execute(
+                    """
+                    INSERT INTO repo_history (url_hash, repo_name, first_seen_date, last_seen_date, max_stars)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(url_hash) DO UPDATE SET
+                        last_seen_date = excluded.last_seen_date,
+                        max_stars = MAX(repo_history.max_stars, excluded.max_stars)
+                    """,
+                    (url_hash, repo_name, date, date, stars),
+                )
             conn.commit()

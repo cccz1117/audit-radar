@@ -79,6 +79,38 @@
       "url": "https://lobste.rs/rss",
       "weight": 4,
       "enabled": true
+    },
+    {
+      "name": "财联社电报",
+      "type": "newsnow",
+      "source_id": "cls-telegraph",
+      "category": "regulatory",
+      "weight": 9,
+      "enabled": true
+    },
+    {
+      "name": "华尔街见闻快讯",
+      "type": "newsnow",
+      "source_id": "wallstreetcn-quick",
+      "category": "regulatory",
+      "weight": 8,
+      "enabled": true
+    },
+    {
+      "name": "HackerNews",
+      "type": "newsnow",
+      "source_id": "hackernews",
+      "category": "papers",
+      "weight": 7,
+      "enabled": true
+    },
+    {
+      "name": "IT之家",
+      "type": "newsnow",
+      "source_id": "ithome",
+      "category": "papers",
+      "weight": 6,
+      "enabled": true
     }
   ]
 }

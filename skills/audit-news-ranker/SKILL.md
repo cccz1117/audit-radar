@@ -88,6 +88,34 @@ triggers:
 
 ---
 
+# GitHub Repo 特殊优先级规则
+
+候选中可能包含 GitHub Trending repo（source_type=newsnow，link 含 github.com）。请按以下规则处理：
+
+## 新增 repo 优先级提升
+
+如果候选满足以下全部条件，**排名大幅提前**：
+1. `is_new_repo` = true（今天首次进入候选池）
+2. `repo_stars` >= 20000
+3. 标题或摘要涉及以下任一主题：
+   - 大模型安全 / AI Safety / prompt leak / jailbreak
+   - 监管合规 / compliance / audit / governance
+   - 网络安全 / security / vulnerability / CVE
+   - 金融 AI / banking / finance + AI
+
+例如：`system_prompts_leaks`（提取各大模型 system prompt）这类 repo，如果新增且 star 超过 20k，应作为信号二（前沿科技与安全）的强候选。
+
+## 非新增 repo 的处理
+
+- 如果不是新增 repo，**不主动提升优先级**。
+- 但如果该 repo 被媒体（量子位、机器之心等）同日报道，形成多源共振，则正常参与评分。
+
+## 非相关主题 repo 的处理
+
+- 如果新增 repo 但主题与审计无关（如游戏、前端工具、娱乐类），按普通技术新闻评分，不特别提升。
+
+---
+
 # 分类配额规则（三条线的黄金比例）
 
 日报固定三条，每条线最多占一条，确保覆盖面：
