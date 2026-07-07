@@ -188,11 +188,11 @@
       "enabled": true
     },
     {
-      "name": "IT之家",
-      "type": "newsnow",
-      "source_id": "ithome",
-      "category": "papers",
-      "weight": 6,
+      "name": "WIRED AI",
+      "type": "rss",
+      "category": "tech",
+      "url": "https://www.wired.com/feed/tag/ai/latest/rss",
+      "weight": 7,
       "enabled": true
     }
   ]
