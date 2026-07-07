@@ -22,7 +22,8 @@ class Generator:
             user=user_prompt,
             task="generate",
             temperature=0.5,  # 生成需要一定灵活性
-            timeout=180,
+            timeout=60,
+        )
         )
         return resp
 

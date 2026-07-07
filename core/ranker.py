@@ -23,7 +23,8 @@ class Ranker:
             system=self.system_prompt,
             user=user_prompt,
             task="rank",
-            timeout=120,
+            timeout=60,
+        )
         )
         return self._parse_results(resp, candidates)
 
