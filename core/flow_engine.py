@@ -117,62 +117,66 @@ class FlowEngine:
         if parser == "json":
             return safe_json_parse(content)
         return content
-        """执行 LLM 节点。"""
-        import requests
 
-        # 读取 System Prompt
-        prompt_path = node["system_prompt"]
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            system_prompt = f.read()
+    def _safe_eval_condition(self, expr: str) -> bool:
+        """安全解析条件表达式。只允许 len() 和比较运算符。"""
+        import ast
 
-        # 解析用户输入（包含 ${node_id} 引用）
-        user_input = self._resolve_input(node.get("input", ""))
+        allowed_names = {"len": len, "True": True, "False": False}
 
-        # 限制长度（防止超过 token 上限）
-        if isinstance(user_input, str) and len(user_input) > 12000:
-            user_input = user_input[:12000] + "\n...[截断]"
+        try:
+            tree = ast.parse(expr, mode="eval")
+        except SyntaxError:
+            raise ValueError(f"表达式语法错误: {expr}")
 
-        model = node.get("model", config.MODEL_NAME)
-        temperature = node.get("temperature", config.MODEL_TEMPERATURE)
-        max_tokens = node.get("max_tokens", config.MODEL_MAX_TOKENS)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                if not isinstance(node.func, ast.Name) or node.func.id != "len":
+                    raise ValueError(f"不允许的函数: {node.func.id}")
+            elif isinstance(node, ast.Name):
+                if node.id not in allowed_names:
+                    raise ValueError(f"不允许的变量: {node.id}")
+            elif isinstance(node, ast.Constant):
+                continue
+            elif isinstance(node, ast.List):
+                continue
+            elif isinstance(node, ast.Tuple):
+                continue
+            elif isinstance(node, ast.Expression):
+                continue
+            elif isinstance(node, ast.Load):
+                continue
+            elif isinstance(node, ast.Compare):
+                continue
+            elif isinstance(node, ast.BoolOp):
+                continue
+            elif isinstance(node, ast.BinOp):
+                continue
+            elif isinstance(node, ast.UnaryOp):
+                continue
+            elif isinstance(node, (ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Is, ast.IsNot, ast.In, ast.NotIn)):
+                continue
+            elif isinstance(node, (ast.And, ast.Or)):
+                continue
+            elif isinstance(node, (ast.Not, ast.UAdd, ast.USub)):
+                continue
+            elif isinstance(node, ast.Num):  # Python 3.7 compat
+                continue
+            elif isinstance(node, ast.Str):  # Python 3.7 compat
+                continue
+            else:
+                raise ValueError(f"不允许的表达式节点: {type(node).__name__}")
 
-        headers = {
-            "Authorization": f"Bearer {config.DASHSCOPE_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_input},
-            ],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-
-        r = requests.post(
-            f"{config.DASHSCOPE_BASE_URL}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=180,
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"]
-
-        # 如果配置了 output_parser，尝试解析
-        parser = node.get("output_parser")
-        if parser == "json":
-            return self._safe_json_parse(content)
-        return content
+        return eval(compile(tree, "<string>", "eval"), {"__builtins__": {}}, allowed_names)
 
     def _run_condition(self, node: Dict) -> Any:
-        """执行条件分支节点。"""
+        """执行条件分支节点。使用 AST 白名单解析，禁止 eval 任意代码。"""
         expr = node["if"]
-        # 简单表达式求值：如 "len(${screen}) < 10"
         resolved_expr = self._resolve_input(expr)
         try:
-            condition = eval(resolved_expr, {"__builtins__": {}}, {})
-        except Exception:
+            condition = self._safe_eval_condition(resolved_expr)
+        except ValueError as e:
+            print(f"   ⚠️ 条件表达式安全校验失败: {e}")
             condition = False
 
         print(f"   条件: {resolved_expr} → {condition}")
