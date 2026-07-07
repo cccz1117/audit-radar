@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS reported_urls (
     date TEXT NOT NULL,
     url_hash TEXT NOT NULL,
     title TEXT,
+    summary TEXT,
     UNIQUE(date, url_hash)
 );
 CREATE INDEX IF NOT EXISTS idx_reported_urls_hash ON reported_urls(url_hash);
@@ -149,6 +151,21 @@ CREATE TABLE IF NOT EXISTS weekly_reports (
     status TEXT DEFAULT 'draft'
 );
 
+-- 论文库（用于跨天追踪论文，供后续引用时补全摘要）
+CREATE TABLE IF NOT EXISTS papers (
+    url_hash TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    authors TEXT,
+    abstract TEXT,
+    link TEXT NOT NULL,
+    source TEXT,
+    first_seen_date TEXT NOT NULL,
+    last_seen_date TEXT NOT NULL,
+    metadata TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_papers_title ON papers(title);
+CREATE INDEX IF NOT EXISTS idx_papers_date ON papers(first_seen_date);
+
 """
 
 
@@ -166,7 +183,12 @@ class SQLiteBackend(StorageBackend):
     def _init_db(self):
         with self._conn() as conn:
             conn.executescript(SCHEMA)
-            conn.commit()
+            # 兼容旧库：为 reported_urls 增加 summary 字段
+            try:
+                conn.execute("ALTER TABLE reported_urls ADD COLUMN IF NOT EXISTS summary TEXT")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
 
     @staticmethod
     def _url_hash(link: str) -> str:
@@ -392,7 +414,7 @@ class SQLiteBackend(StorageBackend):
             conn.commit()
 
     def save_reported_urls(self, date: str, items: List[Dict]) -> None:
-        """保存某日最终入选报道的 URL。"""
+        """保存某日最终入选报道的 URL 和摘要。"""
         with self._conn() as conn:
             for item in items:
                 link = item.get("link", "") or ""
@@ -402,11 +424,23 @@ class SQLiteBackend(StorageBackend):
                 try:
                     conn.execute(
                         """
-                        INSERT INTO reported_urls (date, url_hash, title)
-                        VALUES (?, ?, ?)
+                        INSERT INTO reported_urls (date, url_hash, title, summary)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(date, url_hash) DO UPDATE SET
+                            title = excluded.title,
+                            summary = COALESCE(excluded.summary, reported_urls.summary)
                         """,
-                        (date, url_hash, item.get("title", "")),
+                        (date, url_hash, item.get("title", ""), item.get("summary", "")),
                     )
+                except sqlite3.OperationalError:
+                    # 旧库无 summary 字段时的兼容：仅插入 date/url_hash/title
+                    try:
+                        conn.execute(
+                            "INSERT INTO reported_urls (date, url_hash, title) VALUES (?, ?, ?)",
+                            (date, url_hash, item.get("title", "")),
+                        )
+                    except sqlite3.IntegrityError:
+                        pass
                 except sqlite3.IntegrityError:
                     pass
             conn.commit()
@@ -436,26 +470,22 @@ class SQLiteBackend(StorageBackend):
         with self._conn() as conn:
             rows = conn.execute(
                 """
-                SELECT date, top3, summary FROM reports
+                SELECT date, url_hash, title, summary FROM reported_urls
                 WHERE date >= ?
                 ORDER BY date DESC
                 """,
                 (cutoff,),
             ).fetchall()
 
-        items = []
-        for date, top3_raw, summary in rows:
-            top3 = json.loads(top3_raw) if top3_raw else []
-            for t in top3:
-                items.append(
-                    {
-                        "date": date,
-                        "title": t.get("title", ""),
-                        "summary": "",
-                        "line": t.get("line", ""),
-                    }
-                )
-        return items
+        return [
+            {
+                "date": date,
+                "title": title or "",
+                "summary": summary or "",
+                "url_hash": url_hash or "",
+            }
+            for date, url_hash, title, summary in rows
+        ]
 
     def get_repo_history(self, url_hashes: List[str]) -> Dict[str, Dict]:
         """批量查询 repo 历史。返回 {url_hash: {...}}。"""
@@ -653,3 +683,113 @@ class SQLiteBackend(StorageBackend):
             "html": row[2],
             "status": row[3],
         }
+
+    def save_papers(self, date: str, candidates: List[Dict]) -> None:
+        """保存论文候选到论文库。"""
+        with self._conn() as conn:
+            for c in candidates:
+                link = c.get("link", "") or ""
+                if not link:
+                    continue
+                url_hash = self._url_hash(link)
+                title = c.get("title", "")
+                # 只保存看起来是论文的条目
+                if not self._looks_like_paper(link, title, c.get("source", "")):
+                    continue
+                abstract = c.get("summary", "") or c.get("abstract", "")
+                authors = c.get("authors", "")
+                metadata = json.dumps(c.get("metadata", {}), ensure_ascii=False)
+                conn.execute(
+                    """
+                    INSERT INTO papers
+                    (url_hash, title, authors, abstract, link, source,
+                     first_seen_date, last_seen_date, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(url_hash) DO UPDATE SET
+                        last_seen_date = excluded.last_seen_date,
+                        abstract = COALESCE(excluded.abstract, papers.abstract),
+                        title = excluded.title
+                    """,
+                    (url_hash, title, authors, abstract, link,
+                     c.get("source", ""), date, date, metadata),
+                )
+            conn.commit()
+
+    @staticmethod
+    def _looks_like_paper(link: str, title: str, source: str) -> bool:
+        """判断是否为论文条目。"""
+        link_l = link.lower()
+        title_l = title.lower()
+        source_l = source.lower()
+        if "arxiv.org" in link_l:
+            return True
+        if "huggingface.co/papers" in link_l:
+            return True
+        if "paperswithcode.com" in link_l:
+            return True
+        if "arxiv" in source_l or "huggingface papers" in source_l:
+            return True
+        # 标题含 arXiv ID，如 arXiv:2401.12345
+        if re.search(r"arxiv\s*[:\-]?\s*\d{4}\.\d+", title_l):
+            return True
+        return False
+
+    def get_paper_by_link(self, link: str) -> Optional[Dict]:
+        """通过链接查询论文。"""
+        url_hash = self._url_hash(link)
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT title, authors, abstract, link, source, first_seen_date, metadata
+                FROM papers WHERE url_hash = ?
+                """,
+                (url_hash,),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "title": row[0],
+            "authors": row[1],
+            "abstract": row[2],
+            "link": row[3],
+            "source": row[4],
+            "first_seen_date": row[5],
+            "metadata": json.loads(row[6]) if row[6] else {},
+        }
+
+    def search_papers_by_title(self, title: str, days: int = 30) -> List[Dict]:
+        """按标题关键词搜索最近 N 天的论文（关键词之间是 AND 关系）。"""
+        from datetime import datetime, timedelta
+
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        keywords = [k.strip() for k in title.lower().split() if len(k.strip()) >= 2]
+        if not keywords:
+            return []
+
+        conditions = " AND ".join(["LOWER(title) LIKE ?"] * len(keywords))
+        params = [f"%{k}%" for k in keywords]
+        params.append(cutoff)
+
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT title, authors, abstract, link, source, first_seen_date, metadata
+                FROM papers
+                WHERE {conditions} AND first_seen_date >= ?
+                ORDER BY first_seen_date DESC
+                LIMIT 5
+                """,
+                tuple(params),
+            ).fetchall()
+        return [
+            {
+                "title": r[0],
+                "authors": r[1],
+                "abstract": r[2],
+                "link": r[3],
+                "source": r[4],
+                "first_seen_date": r[5],
+                "metadata": json.loads(r[6]) if r[6] else {},
+            }
+            for r in rows
+        ]

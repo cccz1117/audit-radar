@@ -1,7 +1,10 @@
+# NOTE: This FlowEngine workflow is currently NOT the active entry point.
+# The active daily pipeline is index.py and the active weekly pipeline is weekly.py.
+# Kept for reference and future migration.
 pipeline:
   name: "audit-daily-v2"
   version: "1.0.0"
-  description: "Flow Engineering 驱动的审计日报工作流"
+  description: "Flow Engineering 驱动的审计日报工作流（参考版）"
 
   nodes:
     # ========== 1. 采集 ==========

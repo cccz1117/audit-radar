@@ -14,6 +14,7 @@ from core.sender import Sender
 from core.storage import SQLiteBackend
 from core.skill_loader import load_skill
 from core.dedup import dedup_pipeline
+from core.papers import looks_like_paper, normalize_paper_candidate, enrich_candidates
 
 
 # 本地开发用 data/audit.db，FC 生产环境用 NAS 挂载路径
@@ -76,6 +77,13 @@ def handler(event, context):
     fetcher = Fetcher()
     candidates = fetcher.fetch_all()
     print(f"   总计候选: {len(candidates)} 条")
+
+    # 1.1 论文入库：先把论文类候选存进 papers 表
+    paper_candidates = [normalize_paper_candidate(c) for c in candidates if looks_like_paper(c)]
+    if paper_candidates:
+        storage.save_papers(today, paper_candidates)
+        print(f"   论文入库: {len(paper_candidates)} 条")
+
     storage.save_candidates(today, candidates)
     storage.record_source_status(today, "all", len(candidates), "success")
 
@@ -93,10 +101,16 @@ def handler(event, context):
     # 1.6 标记 GitHub repo 新增性
     _mark_github_repos(fresh_candidates, storage, today)
 
+    # 1.7 论文摘要富化：如果候选提到库中已有论文，补充 abstract
+    enriched_candidates = enrich_candidates(fresh_candidates, storage)
+    enriched_count = sum(1 for c in enriched_candidates if c.get("paper_enriched"))
+    if enriched_count:
+        print(f"   论文摘要富化: {enriched_count} 条")
+
     # 2. 粗筛（日报 + 深度池分离）
     _skill_log("FILTER", "rss-audit-screener")
     selector = Selector()
-    screened, deep_dive_candidates = selector.screen(fresh_candidates)
+    screened, deep_dive_candidates = selector.screen(enriched_candidates)
     print(f"   日报保留: {len(screened)} 条 | 深度池候选: {len(deep_dive_candidates)} 条")
     storage.save_screened(today, screened)
     if deep_dive_candidates:
@@ -141,7 +155,7 @@ def handler(event, context):
     # 5. 生成
     _skill_log("GEN", "report-generator")
     generator = Generator()
-    html = generator.generate(top3, clusters)
+    html = generator.generate(top3, clusters, today)
     print(f"   HTML 长度: {len(html)} chars")
     storage.save_report(
         today,

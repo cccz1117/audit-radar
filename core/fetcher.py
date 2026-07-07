@@ -108,12 +108,12 @@ class Fetcher:
 
     def _fetch_rss(self, src: Dict) -> List[Dict]:
         """RSS 信源通用抓取。"""
-        resp = requests.get(
+        timeout = src.get("timeout", config.REQUEST_TIMEOUT)
+        resp = self._request_with_retry(
             src["url"],
-            timeout=config.REQUEST_TIMEOUT,
             headers={"User-Agent": "AuditRadar/1.0"},
+            timeout=timeout,
         )
-        resp.raise_for_status()
         root = ET.fromstring(resp.content)
         items = []
         # 兼容 RSS 2.0 / Atom
@@ -165,15 +165,15 @@ class Fetcher:
         """NewsNow API 信源。"""
         source_id = src["source_id"]
         url = f"https://newsnow.busiyi.world/api/s?id={source_id}&latest"
-        resp = requests.get(
+        timeout = src.get("timeout", config.REQUEST_TIMEOUT)
+        resp = self._request_with_retry(
             url,
-            timeout=config.REQUEST_TIMEOUT,
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
                 "Accept": "application/json",
             },
+            timeout=timeout,
         )
-        resp.raise_for_status()
         data = resp.json()
         items = []
         for item in data.get("items", [])[: config.RSS_MAX_ITEMS]:
@@ -210,6 +210,22 @@ class Fetcher:
                 "stars": stars,
             })
         return items
+
+    @staticmethod
+    def _request_with_retry(url: str, headers: Dict, timeout: int, max_retries: int = 2):
+        """带重试的 HTTP GET。"""
+        last_err = None
+        for attempt in range(max_retries + 1):
+            try:
+                resp = requests.get(url, headers=headers, timeout=timeout)
+                resp.raise_for_status()
+                return resp
+            except Exception as e:
+                last_err = e
+                if attempt < max_retries:
+                    import time
+                    time.sleep(1 * (attempt + 1))
+        raise last_err
 
     @staticmethod
     def _strip_html(raw: str) -> str:

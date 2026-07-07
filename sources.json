@@ -33,18 +33,10 @@
       "enabled": true
     },
     {
-      "name": "Risk.net",
+      "name": "Forrester Risk Management",
       "type": "rss",
       "category": "regulatory",
-      "url": "https://www.risk.net/rss",
-      "weight": 9,
-      "enabled": true
-    },
-    {
-      "name": "Finextra",
-      "type": "rss",
-      "category": "regulatory",
-      "url": "https://www.finextra.com/rss",
+      "url": "https://www.forrester.com/blogs/category/risk-management/feed/",
       "weight": 8,
       "enabled": true
     },
@@ -52,7 +44,7 @@
       "name": "Cisco",
       "type": "rss",
       "category": "papers",
-      "url": "https://blogs.cisco.com/datacenter/feed",
+      "url": "https://blogs.cisco.com/feed",
       "weight": 7,
       "enabled": true
     },
@@ -62,14 +54,6 @@
       "category": "papers",
       "url": "https://www.technologyreview.com/feed/",
       "weight": 7,
-      "enabled": true
-    },
-    {
-      "name": "HuggingFace Papers",
-      "type": "api",
-      "category": "papers",
-      "url": "https://raw.githubusercontent.com/huangboming/huggingface-daily-paper-feed/main/feed.xml",
-      "weight": 6,
       "enabled": true
     },
     {
@@ -108,6 +92,75 @@
       "weight": 7,
       "report_cycle": "weekly",
       "content_type": "podcast",
+      "enabled": true
+    },
+    {
+      "name": "Hacker News: Front Page",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://hnrss.org/frontpage",
+      "weight": 6,
+      "enabled": true
+    },
+    {
+      "name": "Hacker News: Best",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://hnrss.org/best",
+      "weight": 7,
+      "enabled": true
+    },
+    {
+      "name": "arXiv cs.AI",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://rss.arxiv.org/rss/cs.AI",
+      "weight": 4,
+      "content_type": "paper",
+      "enabled": true
+    },
+    {
+      "name": "arXiv cs.LG",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://rss.arxiv.org/rss/cs.LG",
+      "weight": 4,
+      "content_type": "paper",
+      "enabled": true
+    },
+    {
+      "name": "arXiv cs.CR",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://rss.arxiv.org/rss/cs.CR",
+      "weight": 5,
+      "content_type": "paper",
+      "enabled": true
+    },
+    {
+      "name": "arXiv cs.CV",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://rss.arxiv.org/rss/cs.CV",
+      "weight": 3,
+      "content_type": "paper",
+      "enabled": true
+    },
+    {
+      "name": "arXiv cs.SI",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://rss.arxiv.org/rss/cs.SI",
+      "weight": 3,
+      "content_type": "paper",
+      "enabled": true
+    },
+    {
+      "name": "cccz1117 Scour",
+      "type": "rss",
+      "category": "papers",
+      "url": "https://scour.ing/@cccz1117/rss.xml?t=1d&all_feeds=true",
+      "weight": 6,
       "enabled": true
     },
     {

@@ -40,12 +40,15 @@ class WeeklyGenerator:
             reverse=True,
         ):
             source = c.get("source", "")
-            if source not in seen_sources or len(seen_sources) >= 2:
+            if source not in seen_sources:
                 diversified.append(c)
                 seen_sources.add(source)
+            elif len(seen_sources) >= 2:
+                # 已有至少两个不同来源后，允许同来源的优质候选填补剩余位置
+                diversified.append(c)
             if len(diversified) >= 3:
                 break
-        return diversified[:3]
+        return diversified
 
     def _format_prompt(self, selected: List[Dict], week_id: str) -> str:
         lines = [f"周次：{week_id}", f"候选数量：{len(selected)}", ""]

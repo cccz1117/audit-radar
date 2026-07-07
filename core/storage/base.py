@@ -107,3 +107,15 @@ class StorageBackend(ABC):
     @abstractmethod
     def get_weekly_report(self, week_id: str) -> Optional[Dict]:
         """读取周报。"""
+
+    @abstractmethod
+    def save_papers(self, date: str, candidates: List[Dict]) -> None:
+        """保存论文候选到论文库。"""
+
+    @abstractmethod
+    def get_paper_by_link(self, link: str) -> Optional[Dict]:
+        """通过链接查询论文。"""
+
+    @abstractmethod
+    def search_papers_by_title(self, title: str, days: int = 30) -> List[Dict]:
+        """按标题模糊搜索最近 N 天的论文。"""

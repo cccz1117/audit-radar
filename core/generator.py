@@ -15,13 +15,13 @@ class Generator:
     def __init__(self):
         self.system_prompt = load_skill_prompt("report-generator")
 
-    def generate(self, top3: List[Dict], clusters: List[Dict]) -> str:
+    def generate(self, top3: List[Dict], clusters: List[Dict], date: str = "今日") -> str:
         """输入 Top3 新闻 + 完整事件簇，生成 HTML 日报。"""
-        user_prompt = self._build_prompt(top3, clusters)
+        user_prompt = self._build_prompt(top3, clusters, date)
         resp = self._call_llm(user_prompt)
         return resp
 
-    def _build_prompt(self, top3: List[Dict], clusters: List[Dict]) -> str:
+    def _build_prompt(self, top3: List[Dict], clusters: List[Dict], date: str) -> str:
         # 为 Top3 补充完整素材
         enriched = []
         for item in top3:
@@ -46,7 +46,7 @@ class Generator:
                         ],
                     })
                     break
-        return json.dumps({"top3": enriched, "date": "今日", "mode": "draft"}, ensure_ascii=False, indent=2)
+        return json.dumps({"top3": enriched, "date": date, "mode": "draft"}, ensure_ascii=False, indent=2)
 
     def _call_llm(self, user_prompt: str) -> str:
         headers = {

@@ -25,5 +25,8 @@ MAIL_FROM = os.getenv("MAIL_FROM", MAIL_USER)
 # -- 路径 --
 SOURCES_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
 
+# -- 共振 --
+RESONANCE_USE_AI = os.getenv("RESONANCE_USE_AI", "false").lower() in ("1", "true", "yes")
+
 # -- 调试 --
 DEBUG = os.getenv("DEBUG", "false").lower() in ("1", "true", "yes")

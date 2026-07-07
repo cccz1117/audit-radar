@@ -103,6 +103,6 @@
 # Project-specific
 # =============================================================================
 # Ignore any future local data or output directories you might create
-**/data/local/
+**/data/
 **/output/
 **/outputs/
