@@ -4,20 +4,19 @@ import json
 from typing import List, Dict
 
 from core.llm_client import chat_completion, safe_json_parse
-import config
+from core.skill_loader import load_skill_prompt
 
 
 class Selector:
-    """审计新闻粗筛器。"""
+    """AI 行业情报粗筛器。"""
 
     def __init__(self):
-        with open(config.PROMPTS_DIR + "/selector_system.txt", "r", encoding="utf-8") as f:
-            self.system_prompt = f.read()
+        self.system_prompt = load_skill_prompt("rss-audit-screener")
 
-    def screen(self, candidates: List[Dict]) -> List[Dict]:
-        """输入候选池，返回 keep=strong/yes 的条目。"""
+    def screen(self, candidates: List[Dict]) -> tuple[List[Dict], List[Dict]]:
+        """输入候选池，返回 (日报保留, 深度池候选)。"""
         if not candidates:
-            return []
+            return [], []
         user_prompt = self._format_candidates(candidates)
         resp = chat_completion(
             system=self.system_prompt,
@@ -25,32 +24,32 @@ class Selector:
             task="screen",
             timeout=60,
         )
-        )
         return self._parse_results(resp, candidates)
 
-    def _format_candidates(self, candidates: List[Dict]) -> str:
-        lines = []
-        for i, c in enumerate(candidates, 1):
-            lines.append(
-                f"[{i}] {c['title']} | 来源:{c['source']} | 日期:{c.get('date','')[:10]} | 摘要:{c.get('summary','')[:300]}"
-            )
-        return "\n".join(lines)
-
-    def _parse_results(self, raw: str, candidates: List[Dict]) -> List[Dict]:
+    def _parse_results(self, raw: str, candidates: List[Dict]) -> tuple[List[Dict], List[Dict]]:
         """解析模型返回的 JSON 数组。兼容 markdown 代码块。"""
         results = safe_json_parse(raw)
         if not isinstance(results, list):
             print(f"  ⚠️ JSON parse failed, fallback to text scan")
-            return candidates  # 保守：全部保留
+            return candidates, []  # 保守：全部保留，无深度池
         kept = []
+        deep_dive = []
         for r in results:
             if r.get("keep") in ("strong", "yes"):
                 for c in candidates:
                     if c["title"] == r.get("title", "") or r.get("title", "") in c["title"]:
                         c["keep_reason"] = r.get("reason", "")
-                        c["audit_mapping"] = r.get("audit_mapping_guess", "")
+                        c["industry_mapping"] = r.get("industry_mapping", "")
                         c["total_score"] = r.get("total_score", 0)
+                        c["deep_dive_candidate"] = r.get("deep_dive_candidate", False)
+                        c["deep_dive_reason"] = r.get("deep_dive_reason", "")
                         kept.append(c)
                         break
-        print(f"  ✅ 粗筛保留: {len(kept)} / {len(candidates)}")
-        return kept
+            if r.get("deep_dive_candidate") is True:
+                for c in candidates:
+                    if c["title"] == r.get("title", "") or r.get("title", "") in c["title"]:
+                        if c not in deep_dive:
+                            deep_dive.append(c)
+                        break
+        print(f"  ✅ 粗筛保留: {len(kept)} / {len(candidates)} | 深度池: {len(deep_dive)}")
+        return kept, deep_dive

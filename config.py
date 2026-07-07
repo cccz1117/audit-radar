@@ -68,7 +68,6 @@ MAIL_FROM = os.getenv("MAIL_FROM", MAIL_USER)
 AUDIT_DB_PATH = os.getenv("AUDIT_DB_PATH", "data/audit.db")
 
 # ── 路径 ──
-PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 SOURCES_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
 
 # ── 调试 ──

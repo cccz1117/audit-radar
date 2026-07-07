@@ -194,6 +194,38 @@
       "url": "https://www.wired.com/feed/tag/ai/latest/rss",
       "weight": 7,
       "enabled": true
+    },
+    {
+      "name": "The Information",
+      "type": "rss",
+      "category": "tech",
+      "url": "https://www.theinformation.com/feed",
+      "weight": 9,
+      "enabled": true
+    },
+    {
+      "name": "AlphaSignal",
+      "type": "rss",
+      "category": "tech",
+      "url": "https://alphasignal.ai/feed.xml",
+      "weight": 8,
+      "enabled": true
+    },
+    {
+      "name": "Techmeme",
+      "type": "rss",
+      "category": "tech",
+      "url": "https://www.techmeme.com/feed.xml",
+      "weight": 8,
+      "enabled": true
+    },
+    {
+      "name": "Hacker News: Front Page (Algolia)",
+      "type": "api",
+      "category": "tech",
+      "url": "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=20",
+      "weight": 7,
+      "enabled": true
     }
   ]
 }

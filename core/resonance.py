@@ -14,13 +14,17 @@ class ResonanceDetector:
     """事件聚类 + 共振评分。"""
 
     # 高权重信源，本地评分时额外加分
-    HIGH_WEIGHT_SOURCES = {"Risk.net", "Finextra", "DataCenterDynamics", "nvd-high", "nvd-critical"}
+    HIGH_WEIGHT_SOURCES = {
+        "Risk.net", "Finextra", "DataCenterDynamics",
+        "nvd-high", "nvd-critical",
+        "The Information", "WIRED AI", "AlphaSignal",
+    }
 
     def detect(self, candidates: List[Dict]) -> List[Dict]:
         """输入粗筛后的候选，输出聚类后的事件簇（含共振分）。"""
         clusters = self._cluster(candidates)
         for cluster in clusters:
-            if config.RESONANCE_USE_AI and len(cluster.get("sources", [])) >= 2:
+            if getattr(config, "RESONANCE_USE_AI", False) and len(cluster.get("sources", [])) >= 2:
                 # 多源 cluster 用 LLM 做一致性校验和精评
                 self._llm_score_cluster(cluster)
             else:

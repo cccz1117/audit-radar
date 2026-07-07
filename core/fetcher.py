@@ -82,12 +82,14 @@ class Fetcher:
         return result
 
     def _fetch_api(self, src: Dict) -> List[Dict]:
-        """API 信源（NVD / HF Papers）。"""
+        """API 信源（NVD / HF Papers / HN Algolia）。"""
         url = src["url"]
         if "nvd.nist.gov" in url:
             return self._fetch_nvd(url)
         if "huggingface.co" in url and "daily-papers" in url:
             return self._fetch_hf_papers(url)
+        if "hn.algolia.com" in url:
+            return self._fetch_hn_algolia(url)
         return []
 
     def _fetch_nvd(self, url: str) -> List[Dict]:
@@ -143,12 +145,50 @@ class Fetcher:
             })
         return items
 
+    def _fetch_hn_algolia(self, url: str) -> List[Dict]:
+        """HN Algolia API：提取 points、comments、title、url。"""
+        resp = requests.get(
+            url,
+            timeout=config.REQUEST_TIMEOUT,
+            headers={"User-Agent": "AuditRadar/1.0"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        items = []
+        for hit in data.get("hits", [])[: config.RSS_MAX_ITEMS]:
+            points = hit.get("points", 0) or 0
+            num_comments = hit.get("num_comments", 0) or 0
+            title = hit.get("title", "")
+            link = hit.get("url", "")
+            # 如果原始文章链接为空，fallback 到 HN 讨论页面
+            if not link:
+                link = f"https://news.ycombinator.com/item?id={hit.get('objectID', '')}"
+            created_at = hit.get("created_at", "")
+            author = hit.get("author", "")
+            summary = f"HN {points} 分 | {num_comments} 评论 | 作者 {author}"
+            items.append({
+                "title": title,
+                "date": created_at,
+                "summary": summary,
+                "link": link,
+                "raw_score": points,
+                "hn_score": points,
+                "num_comments": num_comments,
+            })
+        return items
+
     def _fetch_rss(self, src: Dict) -> List[Dict]:
-        """RSS 信源通用抓取。"""
+        """RSS 信源通用抓取。支持提取 category 标签。"""
         timeout = src.get("timeout", config.REQUEST_TIMEOUT)
+        # 对 The Information 使用浏览器 UA 降低 Cloudflare 拦截概率
+        ua = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            if "theinformation.com" in src.get("url", "")
+            else "AuditRadar/1.0"
+        )
         resp = self._request_with_retry(
             src["url"],
-            headers={"User-Agent": "AuditRadar/1.0"},
+            headers={"User-Agent": ua},
             timeout=timeout,
         )
         root = ET.fromstring(resp.content)
@@ -167,13 +207,29 @@ class Fetcher:
             summary_text = self._strip_html(desc.text if desc is not None else "")
             if not summary_text:
                 summary_text = title_text
+
+            # 提取 category 标签（AlphaSignal 等源使用）
+            categories = []
+            for cat in entry.findall("category"):
+                if cat.text:
+                    categories.append(cat.text)
+
+            # 针对 AlphaSignal 的基础 raw_score（内容质量高）
+            raw_score = 0
+            if "alphasignal.ai" in src.get("url", ""):
+                raw_score = 5  # 基础质量加分
+                # security / open source 类别再加权
+                if any(c.lower() in ("security", "open source") for c in categories):
+                    raw_score += 3
+
             items.append({
                 "title": title_text,
                 "date": pub_date.text if pub_date is not None else "",
                 "summary": summary_text,
                 "link": link.text if link is not None else "",
                 "audio_url": audio_url,
-                "raw_score": 0,
+                "raw_score": raw_score,
+                "categories": categories,
             })
             if len(items) >= config.RSS_MAX_ITEMS:
                 break
@@ -194,13 +250,27 @@ class Fetcher:
                 summary_text = self._strip_html(summary.text if summary is not None else "")
                 if not summary_text:
                     summary_text = title_text
+
+                categories = []
+                for cat in entry.findall("atom:category", ns):
+                    term = cat.get("term")
+                    if term:
+                        categories.append(term)
+
+                raw_score = 0
+                if "alphasignal.ai" in src.get("url", ""):
+                    raw_score = 5
+                    if any(c.lower() in ("security", "open source") for c in categories):
+                        raw_score += 3
+
                 items.append({
                     "title": title_text,
                     "date": updated.text if updated is not None else "",
                     "summary": summary_text,
                     "link": link.get("href") if link is not None else "",
                     "audio_url": audio_url,
-                    "raw_score": 0,
+                    "raw_score": raw_score,
+                    "categories": categories,
                 })
                 if len(items) >= config.RSS_MAX_ITEMS:
                     break

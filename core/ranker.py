@@ -4,15 +4,14 @@ import json
 from typing import List, Dict
 
 from core.llm_client import chat_completion, safe_json_parse
-import config
+from core.skill_loader import load_skill_prompt
 
 
 class Ranker:
-    """审计新闻精排器。"""
+    """AI 行业情报精排器。"""
 
     def __init__(self):
-        with open(config.PROMPTS_DIR + "/ranker_system.txt", "r", encoding="utf-8") as f:
-            self.system_prompt = f.read()
+        self.system_prompt = load_skill_prompt("audit-news-ranker")
 
     def rank(self, candidates: List[Dict]) -> Dict:
         """输入共振后的候选，返回 Top3 + Top8 + summary。"""
@@ -24,7 +23,6 @@ class Ranker:
             user=user_prompt,
             task="rank",
             timeout=60,
-        )
         )
         return self._parse_results(resp, candidates)
 
@@ -43,7 +41,7 @@ class Ranker:
         print(f"  ⚠️ Ranker JSON parse failed, fallback")
         top3 = candidates[:3]
         return {
-            "top3": [{"rank": i+1, "line": c["categories"][0], "title": c["event_title"]} for i, c in enumerate(top3)],
+            "top3": [{"rank": i+1, "line": c["categories"][0] if c.get("categories") else "general", "title": c["event_title"], "industry_value": "high"} for i, c in enumerate(top3)],
             "top8": [],
             "summary": "Fallback: 按共振分直接取前3",
         }
