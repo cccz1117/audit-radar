@@ -14,15 +14,20 @@ REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
 NVD_RESULTS_PER_PAGE = int(os.getenv("NVD_RESULTS_PER_PAGE", "10"))
 RSS_MAX_ITEMS = int(os.getenv("RSS_MAX_ITEMS", "20"))
 
+# -- 路径 --
+AUDIT_DB_PATH = os.getenv("AUDIT_DB_PATH", "data/audit.db")
+
+# -- 去重 --
+DEDUP_USE_AI = os.getenv("DEDUP_USE_AI", "false").lower() in ("1", "true", "yes")
+
 # -- 邮件 --
 MAIL_HOST = os.getenv("MAIL_HOST", "")
 MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
 MAIL_USER = os.getenv("MAIL_USER", "")
 MAIL_PASS = os.getenv("MAIL_PASS", "")
-MAIL_TO_LIST = os.getenv("MAIL_TO_LIST", "").split(",")  # 逗号分隔
+MAIL_TO_LIST = [x.strip() for x in os.getenv("MAIL_TO_LIST", "").split(",") if x.strip()]  # 逗号分隔
 MAIL_FROM = os.getenv("MAIL_FROM", MAIL_USER)
 
-# -- 路径 --
 SOURCES_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
 
 # -- 共振 --

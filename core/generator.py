@@ -25,27 +25,47 @@ class Generator:
         # 为 Top3 补充完整素材
         enriched = []
         for item in top3:
-            # 找到对应 cluster
+            title = item.get("title", "")
+            matched_cluster = None
             for c in clusters:
-                if c["event_title"] == item.get("title") or item.get("title", "") in c["event_title"]:
-                    enriched.append({
-                        "title": c["event_title"],
-                        "line": item.get("line", "general"),
-                        "sources": c["sources"],
-                        "resonance_score": c.get("resonance_score", 0),
-                        "resonance_level": c.get("level", "low"),
-                        "items": [
-                            {
-                                "title": x["title"],
-                                "source": x["source"],
-                                "date": x.get("date", "")[:10],
-                                "summary": x.get("summary", ""),
-                                "link": x.get("link", ""),
-                            }
-                            for x in c["items"]
-                        ],
-                    })
+                c_title = c.get("event_title", "")
+                if c_title == title or title in c_title or c_title in title:
+                    matched_cluster = c
                     break
+            if matched_cluster:
+                enriched.append({
+                    "title": matched_cluster["event_title"],
+                    "line": item.get("line", "general"),
+                    "sources": matched_cluster.get("sources", []),
+                    "resonance_score": matched_cluster.get("resonance_score", 0),
+                    "resonance_level": matched_cluster.get("level", "low"),
+                    "items": [
+                        {
+                            "title": x.get("title", ""),
+                            "source": x.get("source", ""),
+                            "date": x.get("date", "")[:10],
+                            "summary": x.get("summary", ""),
+                            "link": x.get("link", ""),
+                        }
+                        for x in matched_cluster.get("items", [])
+                    ],
+                })
+            else:
+                # 找不到 cluster 时，用 top3 自身字段兜底，避免素材丢失
+                enriched.append({
+                    "title": title,
+                    "line": item.get("line", "general"),
+                    "sources": [],
+                    "resonance_score": 0,
+                    "resonance_level": "low",
+                    "items": [{
+                        "title": title,
+                        "source": "",
+                        "date": "",
+                        "summary": item.get("summary", ""),
+                        "link": item.get("link", ""),
+                    }],
+                })
         return json.dumps({"top3": enriched, "date": date, "mode": "draft"}, ensure_ascii=False, indent=2)
 
     def _call_llm(self, user_prompt: str) -> str:
@@ -59,7 +79,7 @@ class Generator:
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": 0.5,  # 生成需要一定灵活性
+            "temperature": config.MODEL_TEMPERATURE,  # 生成需要一定灵活性
             "max_tokens": config.MODEL_MAX_TOKENS,
         }
         r = requests.post(

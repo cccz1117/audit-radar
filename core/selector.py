@@ -32,7 +32,7 @@ class Selector:
             if c.get("audio_url"):
                 audio_info = f" | 音频:{c['audio_url'][:80]}"
             lines.append(
-                f"[{i}] {c['title']} | 来源:{c['source']} | 周期:{cycle} | 类型:{ctype} | 日期:{c.get('date','')[:10]} | 摘要:{c.get('summary','')[:300]}{audio_info}"
+                f"[{i}] {c.get('title','')} | 来源:{c.get('source','')} | 周期:{cycle} | 类型:{ctype} | 日期:{c.get('date','')[:10]} | 摘要:{c.get('summary','')[:300]}{audio_info}"
             )
         return "\n".join(lines)
 
@@ -84,9 +84,11 @@ class Selector:
             matched = self._match_candidate(r.get("title", ""), candidates)
             if not matched:
                 continue
+            matched["keep"] = r.get("keep", "no")
             matched["keep_reason"] = r.get("reason", "")
             matched["audit_mapping_guess"] = r.get("audit_mapping_guess", "")
             matched["total_score"] = r.get("total_score", 0)
+            matched["dimension_scores"] = r.get("dimension_scores", {})
             matched["deep_dive_candidate"] = bool(r.get("deep_dive_candidate", False))
             matched["deep_dive_reason"] = r.get("deep_dive_reason", "")
 

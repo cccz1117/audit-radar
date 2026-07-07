@@ -39,9 +39,14 @@ jobs:
             -x ".git/*" \
             -x ".github/*" \
             -x "*.pyc" \
-            -x "__pycache__/*"
+            -x "__pycache__/*" \
+            -x "data/*" \
+            -x "output/*" \
+            -x "outputs/*" \
+            -x "*.db" \
+            -x "*.log"
 
-      - name: Deploy to FC
+      - name: Deploy Daily Job to FC
         run: |
           aliyun fc-open UpdateFunction \
             --service-name audit-radar \
@@ -52,4 +57,17 @@ jobs:
             --memory-size 512 \
             --timeout 300 \
             --environment-variables \
-              "DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }},MODEL_NAME=${{ secrets.MODEL_NAME || 'deepseek-v4-flash' }},MAIL_HOST=${{ secrets.MAIL_HOST }},MAIL_PORT=${{ secrets.MAIL_PORT || '587' }},MAIL_USER=${{ secrets.MAIL_USER }},MAIL_PASS=${{ secrets.MAIL_PASS }},MAIL_TO_LIST=${{ secrets.MAIL_TO_LIST }},MAIL_FROM=${{ secrets.MAIL_FROM || secrets.MAIL_USER }}"
+              "DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }},MODEL_NAME=${{ secrets.MODEL_NAME || 'deepseek-v4-flash' }},MAIL_HOST=${{ secrets.MAIL_HOST }},MAIL_PORT=${{ secrets.MAIL_PORT || '587' }},MAIL_USER=${{ secrets.MAIL_USER }},MAIL_PASS=${{ secrets.MAIL_PASS }},MAIL_TO_LIST=${{ secrets.MAIL_TO_LIST }},MAIL_FROM=${{ secrets.MAIL_FROM || secrets.MAIL_USER }},AUDIT_DB_PATH=${{ secrets.AUDIT_DB_PATH || '/mnt/audit-radar/data/audit.db' }}"
+
+      - name: Deploy Weekly Job to FC
+        run: |
+          aliyun fc-open UpdateFunction \
+            --service-name audit-radar \
+            --function-name weekly-job \
+            --runtime python3.11 \
+            --handler weekly.handler \
+            --code file://code.zip \
+            --memory-size 512 \
+            --timeout 300 \
+            --environment-variables \
+              "DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }},MODEL_NAME=${{ secrets.MODEL_NAME || 'deepseek-v4-flash' }},MAIL_HOST=${{ secrets.MAIL_HOST }},MAIL_PORT=${{ secrets.MAIL_PORT || '587' }},MAIL_USER=${{ secrets.MAIL_USER }},MAIL_PASS=${{ secrets.MAIL_PASS }},MAIL_TO_LIST=${{ secrets.MAIL_TO_LIST }},MAIL_FROM=${{ secrets.MAIL_FROM || secrets.MAIL_USER }},AUDIT_DB_PATH=${{ secrets.AUDIT_DB_PATH || '/mnt/audit-radar/data/audit.db' }}"

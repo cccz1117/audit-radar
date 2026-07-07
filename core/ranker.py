@@ -26,8 +26,10 @@ class Ranker:
     def _format_candidates(self, candidates: List[Dict]) -> str:
         lines = ["候选列表（已通过粗筛和共振验证）："]
         for i, c in enumerate(candidates, 1):
+            items = c.get("items") or []
+            first_summary = items[0].get("summary", "") if items else ""
             lines.append(
-                f"[{i}] {c['event_title']} | 来源:{','.join(c['sources'])} | 类别:{c['categories']} | 共振分:{c.get('resonance_score',0)} | 摘要:{c['items'][0].get('summary','')[:300]}"
+                f"[{i}] {c.get('event_title','')} | 来源:{','.join(c.get('sources', []))} | 类别:{c.get('categories', [])} | 共振分:{c.get('resonance_score',0)} | 摘要:{first_summary[:300]}"
             )
         return "\n".join(lines)
 
@@ -64,10 +66,13 @@ class Ranker:
             return json.loads(text)
         except json.JSONDecodeError:
             print(f"  [WARN] Ranker JSON parse failed, fallback")
-            # fallback：取前3条
-            top3 = candidates[:3]
+            # fallback：按共振分取前8，前3作为 top3
+            sorted_candidates = sorted(candidates, key=lambda x: x.get("resonance_score", 0), reverse=True)
+            top3 = sorted_candidates[:3]
+            top8 = sorted_candidates[:8]
+            categories = list({cat for c in top8 for cat in (c.get("categories") or [])})
             return {
-                "top3": [{"rank": i+1, "line": c["categories"][0], "title": c["event_title"]} for i, c in enumerate(top3)],
-                "top8": [],
-                "summary": "Fallback: 按共振分直接取前3",
+                "top3": [{"rank": i+1, "line": (c.get("categories") or ["general"])[0], "title": c.get("event_title", "")} for i, c in enumerate(top3)],
+                "top8": [{"rank": i+1, "title": c.get("event_title", "")} for i, c in enumerate(top8)],
+                "summary": f"Fallback: 按共振分直接取前3；覆盖类别: {', '.join(categories) or 'general'}",
             }

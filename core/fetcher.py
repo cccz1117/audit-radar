@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """信源采集器：NVD + RSS + NewsNow + HuggingFace Daily Papers。"""
 import json
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import List, Dict
@@ -31,6 +32,7 @@ class Fetcher:
                 elif src["type"] == "newsnow":
                     items = self._fetch_newsnow(src)
                 else:
+                    print(f"  [WARN] unknown source type '{src.get('type')}' for {src.get('name')}")
                     continue
                 for item in items:
                     item["source"] = src["name"]
@@ -43,6 +45,41 @@ class Fetcher:
             except Exception as e:
                 print(f"  [WARN] {src['name']} failed: {e}")
         return candidates
+
+    def fetch_with_status(self) -> Dict:
+        """采集并返回每个信源的状态，用于监控。"""
+        result = {"candidates": [], "sources": []}
+        for src in self.sources:
+            if not src.get("enabled", True):
+                continue
+            status = {"name": src["name"], "count": 0, "status": "success", "error": ""}
+            try:
+                if src["type"] == "api":
+                    items = self._fetch_api(src)
+                elif src["type"] == "rss":
+                    items = self._fetch_rss(src)
+                elif src["type"] == "newsnow":
+                    items = self._fetch_newsnow(src)
+                else:
+                    status["status"] = "skipped"
+                    status["error"] = f"unknown type {src.get('type')}"
+                    result["sources"].append(status)
+                    continue
+                for item in items:
+                    item["source"] = src["name"]
+                    item["category"] = src.get("category", "general")
+                    item["weight"] = src.get("weight", 5)
+                    item["report_cycle"] = src.get("report_cycle", "daily")
+                    item["content_type"] = src.get("content_type", "article")
+                result["candidates"].extend(items)
+                status["count"] = len(items)
+                print(f"  [NET] {src['name']}: {len(items)} items")
+            except Exception as e:
+                status["status"] = "failed"
+                status["error"] = str(e)
+                print(f"  [WARN] {src['name']} failed: {e}")
+            result["sources"].append(status)
+        return result
 
     def _fetch_api(self, src: Dict) -> List[Dict]:
         """API 信源（NVD / HF Papers）。"""
@@ -126,10 +163,14 @@ class Fetcher:
             audio_url = ""
             if enclosure is not None:
                 audio_url = enclosure.get("url") or ""
+            title_text = title.text if title is not None else ""
+            summary_text = self._strip_html(desc.text if desc is not None else "")
+            if not summary_text:
+                summary_text = title_text
             items.append({
-                "title": title.text if title is not None else "",
+                "title": title_text,
                 "date": pub_date.text if pub_date is not None else "",
-                "summary": self._strip_html(desc.text if desc is not None else ""),
+                "summary": summary_text,
                 "link": link.text if link is not None else "",
                 "audio_url": audio_url,
                 "raw_score": 0,
@@ -149,10 +190,14 @@ class Fetcher:
                     if lnk.get("rel") == "enclosure":
                         audio_url = lnk.get("href") or ""
                         break
+                title_text = title.text if title is not None else ""
+                summary_text = self._strip_html(summary.text if summary is not None else "")
+                if not summary_text:
+                    summary_text = title_text
                 items.append({
-                    "title": title.text if title is not None else "",
+                    "title": title_text,
                     "date": updated.text if updated is not None else "",
-                    "summary": self._strip_html(summary.text if summary is not None else ""),
+                    "summary": summary_text,
                     "link": link.get("href") if link is not None else "",
                     "audio_url": audio_url,
                     "raw_score": 0,
@@ -223,7 +268,6 @@ class Fetcher:
             except Exception as e:
                 last_err = e
                 if attempt < max_retries:
-                    import time
                     time.sleep(1 * (attempt + 1))
         raise last_err
 

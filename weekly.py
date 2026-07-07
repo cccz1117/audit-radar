@@ -5,17 +5,18 @@
     python weekly.py
 """
 import json
-import os
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict
 
 from core.storage import SQLiteBackend
+
+import config
 from core.weekly_generator import WeeklyGenerator
 from core.sender import Sender
 from core.skill_loader import load_skill
 
 
-DEFAULT_DB_PATH = os.getenv("AUDIT_DB_PATH", "data/audit.db")
+DEFAULT_DB_PATH = config.AUDIT_DB_PATH
 
 
 def _iso_week_id(d: datetime = None) -> str:
@@ -120,7 +121,11 @@ def handler(event, context):
     # 3. 生成周报
     _skill_log("GEN", "weekly-report-generator")
     generator = WeeklyGenerator()
-    result = generator.generate(week_candidates, week_id)
+    try:
+        result = generator.generate(week_candidates, week_id)
+    except Exception as e:
+        print(f"   [FAIL] 周报生成 LLM 失败: {e}")
+        return _error_response(week_id, "weekly_generator_failed", str(e))
     html = result.get("html", "")
     topics = result.get("topics", [])
     print(f"   生成主题: {len(topics)} 个 | HTML 长度: {len(html)} chars")
@@ -171,6 +176,19 @@ def handler(event, context):
             },
             ensure_ascii=False,
         ),
+    }
+
+
+def _error_response(week_id: str, stage: str, error: str) -> Dict:
+    """返回统一错误响应。"""
+    return {
+        "statusCode": 500,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({
+            "week_id": week_id,
+            "stage": stage,
+            "error": error,
+        }, ensure_ascii=False),
     }
 
 

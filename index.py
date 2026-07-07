@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """阿里云 FC 函数入口。编排：采集 → 粗筛 → 共振 → 精排 → 生成 → 发送。"""
 import json
-import os
 from datetime import datetime
 from typing import Dict, List
 
@@ -18,7 +17,7 @@ from core.papers import looks_like_paper, normalize_paper_candidate, enrich_cand
 
 
 # 本地开发用 data/audit.db，FC 生产环境用 NAS 挂载路径
-DEFAULT_DB_PATH = os.getenv("AUDIT_DB_PATH", "data/audit.db")
+DEFAULT_DB_PATH = config.AUDIT_DB_PATH
 
 
 def _is_github_repo(item: Dict) -> bool:
@@ -75,8 +74,19 @@ def handler(event, context):
     # 1. 采集
     print("\n[NET] 1. 采集信源...")
     fetcher = Fetcher()
-    candidates = fetcher.fetch_all()
+    fetch_result = fetcher.fetch_with_status()
+    candidates = fetch_result["candidates"]
     print(f"   总计候选: {len(candidates)} 条")
+
+    # 记录每个信源状态
+    for st in fetch_result.get("sources", []):
+        storage.record_source_status(
+            today,
+            st["name"],
+            st["count"],
+            st["status"],
+            st.get("error", ""),
+        )
 
     # 1.1 论文入库：先把论文类候选存进 papers 表
     paper_candidates = [normalize_paper_candidate(c) for c in candidates if looks_like_paper(c)]
@@ -85,7 +95,6 @@ def handler(event, context):
         print(f"   论文入库: {len(paper_candidates)} 条")
 
     storage.save_candidates(today, candidates)
-    storage.record_source_status(today, "all", len(candidates), "success")
 
     # 1.5 URL 跨天去重（粗筛）
     url_dedup_result = dedup_pipeline(
@@ -110,7 +119,12 @@ def handler(event, context):
     # 2. 粗筛（日报 + 深度池分离）
     _skill_log("FILTER", "rss-audit-screener")
     selector = Selector()
-    screened, deep_dive_candidates = selector.screen(enriched_candidates)
+    try:
+        screened, deep_dive_candidates = selector.screen(enriched_candidates)
+    except Exception as e:
+        print(f"   [FAIL] 粗筛 LLM 失败: {e}")
+        storage.record_push(today, "daily_pipeline", "failed", f"selector: {e}")
+        return _error_response(today, "selector_failed", str(e))
     print(f"   日报保留: {len(screened)} 条 | 深度池候选: {len(deep_dive_candidates)} 条")
     storage.save_screened(today, screened)
     if deep_dive_candidates:
@@ -119,7 +133,7 @@ def handler(event, context):
 
     # 2.5 内容相似度跨天去重（Jaccard + 可选 AI）
     past_items = storage.get_recent_report_items(days=7)
-    use_ai = os.getenv("DEDUP_USE_AI", "false").lower() in ("1", "true", "yes")
+    use_ai = config.DEDUP_USE_AI
     dedup_result = dedup_pipeline(
         [], screened,
         lambda h: False,
@@ -146,7 +160,12 @@ def handler(event, context):
     # 4. 精排
     _skill_log("RANK", "audit-news-ranker")
     ranker = Ranker()
-    result = ranker.rank(clusters)
+    try:
+        result = ranker.rank(clusters)
+    except Exception as e:
+        print(f"   [FAIL] 精排 LLM 失败: {e}")
+        storage.record_push(today, "daily_pipeline", "failed", f"ranker: {e}")
+        return _error_response(today, "ranker_failed", str(e))
     top3 = result.get("top3", [])
     print(f"   Top 3: {len(top3)} 条")
     for t in top3:
@@ -155,7 +174,12 @@ def handler(event, context):
     # 5. 生成
     _skill_log("GEN", "report-generator")
     generator = Generator()
-    html = generator.generate(top3, clusters, today)
+    try:
+        html = generator.generate(top3, clusters, today)
+    except Exception as e:
+        print(f"   [FAIL] 生成 LLM 失败: {e}")
+        storage.record_push(today, "daily_pipeline", "failed", f"generator: {e}")
+        return _error_response(today, "generator_failed", str(e))
     print(f"   HTML 长度: {len(html)} chars")
     storage.save_report(
         today,
@@ -194,7 +218,7 @@ def handler(event, context):
         except Exception as e:
             storage.record_push(today, channel, "failed", str(e))
             print(f"   [FAIL] 发送失败: {e}")
-            raise
+            return _error_response(today, "send_failed", str(e))
 
     print("\n[OK] Audit Radar 完成")
     return {
@@ -209,6 +233,19 @@ def handler(event, context):
             "deduped_screened": len(deduped_screened),
             "clusters": len(clusters),
             "top3": len(top3),
+        }, ensure_ascii=False),
+    }
+
+
+def _error_response(date: str, stage: str, error: str) -> Dict:
+    """记录失败并返回统一错误响应。"""
+    return {
+        "statusCode": 500,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({
+            "date": date,
+            "stage": stage,
+            "error": error,
         }, ensure_ascii=False),
     }
 
