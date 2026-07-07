@@ -9,32 +9,43 @@ def _bool_env(key: str, default: bool = False) -> bool:
 
 
 # ── 多模型供应商配置 ──
-# 当前活跃的供应商：dashscope / zhipu / moonshot
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "dashscope").lower()
+# 文档解析/筛选/生成任务：走第三方官方 API（deepseek / moonshot）
+# STT 等百炼特色任务：走 dashscope（百炼）
+# GLM 保留代码但暂不使用
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek").lower()
 
-# 各供应商 API Key（至少填一个，与 LLM_PROVIDER 对应）
-DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
-ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY", "")
+# ── Chat/Completions 官方 API Key ──
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 MOONSHOT_API_KEY = os.getenv("MOONSHOT_API_KEY", "")
 
-# 各供应商 Base URL（通常不需要改，除非用私有化部署）
+# ── 百炼 API Key（用于 STT 等非 chat 任务）──
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
+
+# ── 智谱 API Key（保留，暂不启用）──
+ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY", "")
+
+# ── 各供应商 Base URL ──
+DEEPSEEK_BASE_URL = os.getenv(
+    "DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"
+)
+MOONSHOT_BASE_URL = os.getenv(
+    "MOONSHOT_BASE_URL", "https://api.moonshot.cn/v1"
+)
 DASHSCOPE_BASE_URL = os.getenv(
     "DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
 )
 ZHIPU_BASE_URL = os.getenv(
     "ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"
 )
-MOONSHOT_BASE_URL = os.getenv(
-    "MOONSHOT_BASE_URL", "https://api.moonshot.cn/v1"
-)
 
-# 模型名称（与供应商对应）
-MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-v4-flash")
+# 模型名称（默认走 DeepSeek 官方）
+MODEL_NAME = os.getenv("MODEL_NAME", "ds-v4-flash")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.3"))
 MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", "8192"))
 
-# 模型路由：不同任务可用不同模型/供应商
-# 格式：provider:model_name，如 "dashscope:deepseek-r1" / "moonshot:kimi-k2-6"
+# 模型路由：不同任务可用不同模型
+# 格式：provider:model_name，如 "deepseek:ds-v4-pro" / "moonshot:kimi-k2-6"
+# 也支持简写：只写模型名（如 "ds-v4-pro"），自动推断供应商
 MODEL_SCREEN = os.getenv("MODEL_SCREEN", "")       # 粗筛，空则 fallback 到 MODEL_NAME
 MODEL_RANK = os.getenv("MODEL_RANK", "")           # 精排，空则 fallback
 MODEL_GENERATE = os.getenv("MODEL_GENERATE", "")   # 生成，空则 fallback
