@@ -85,6 +85,39 @@ class FlowEngine:
 
     def _run_llm(self, node: Dict) -> Any:
         """执行 LLM 节点。"""
+        from core.llm_client import chat_completion, safe_json_parse
+
+        # 读取 System Prompt
+        prompt_path = node["system_prompt"]
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            system_prompt = f.read()
+
+        # 解析用户输入（包含 ${node_id} 引用）
+        user_input = self._resolve_input(node.get("input", ""))
+
+        # 限制长度（防止超过 token 上限）
+        if isinstance(user_input, str) and len(user_input) > 12000:
+            user_input = user_input[:12000] + "\n...[截断]"
+
+        task = node.get("task", "")
+        temperature = node.get("temperature")
+        max_tokens = node.get("max_tokens")
+
+        content = chat_completion(
+            system=system_prompt,
+            user=user_input,
+            task=task,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=180,
+        )
+
+        # 如果配置了 output_parser，尝试解析
+        parser = node.get("output_parser")
+        if parser == "json":
+            return safe_json_parse(content)
+        return content
+        """执行 LLM 节点。"""
         import requests
 
         # 读取 System Prompt
