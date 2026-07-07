@@ -13,11 +13,10 @@ class Sender:
 
     def send(self, html_body: str, subject: str = "AI审计日报"):
         if not config.MAIL_HOST or not config.MAIL_USER or not config.MAIL_TO_LIST:
-            print("  [WARN] 邮件未配置，仅打印")
-            print(f"  To: {config.MAIL_TO_LIST}")
-            print(f"  Subject: {subject}")
-            print(f"  Body: {html_body[:500]}...")
-            return
+            raise RuntimeError(
+                "邮件未配置：MAIL_HOST, MAIL_USER, MAIL_TO_LIST 至少一个缺失。"
+                "日报已生成但未发送。请检查 FC 环境变量或 GitHub Secrets。"
+            )
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = Header(subject, "utf-8")
