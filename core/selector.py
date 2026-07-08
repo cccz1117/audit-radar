@@ -26,6 +26,14 @@ class Selector:
         )
         return self._parse_results(resp, candidates)
 
+    def _format_candidates(self, candidates: List[Dict]) -> str:
+        lines = []
+        for i, c in enumerate(candidates, 1):
+            lines.append(
+                f"[{i}] {c['title']} | 来源:{c['source']} | 日期:{c.get('date','')[:10]} | 摘要:{c.get('summary','')[:300]}"
+            )
+        return "\n".join(lines)
+
     def _parse_results(self, raw: str, candidates: List[Dict]) -> tuple[List[Dict], List[Dict]]:
         """解析模型返回的 JSON 数组。兼容 markdown 代码块。"""
         results = safe_json_parse(raw)

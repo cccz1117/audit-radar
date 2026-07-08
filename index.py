@@ -2,7 +2,10 @@
 """阿里云 FC 函数入口。编排：采集 → 粗筛 → 共振 → 精排 → 生成 → 发送。"""
 import json
 from datetime import datetime
-from typing import Dict, List
+import re
+from typing import Dict, List, Optional
+
+import config
 
 from core.fetcher import Fetcher
 from core.selector import Selector
@@ -175,7 +178,7 @@ def handler(event, context):
     _skill_log("GEN", "report-generator")
     generator = Generator()
     try:
-        html = generator.generate(top3, clusters, today)
+        html = generator.generate(top3, clusters)
     except Exception as e:
         print(f"   [FAIL] 生成 LLM 失败: {e}")
         storage.record_push(today, "daily_pipeline", "failed", f"generator: {e}")
@@ -194,13 +197,11 @@ def handler(event, context):
     # 5.5 记录已报道 URL，用于未来跨天去重
     reported_items = []
     for t in top3:
-        # 从 clusters 中找到对应原始条目，提取 link
-        for c in clusters:
-            if c["event_title"] == t.get("title") or t.get("title", "") in c["event_title"]:
-                for item in c.get("items", []):
-                    if item.get("link"):
-                        reported_items.append(item)
-                break
+        matched = _find_cluster_by_title(t.get("title", ""), clusters)
+        if matched:
+            for item in matched.get("items", []):
+                if item.get("link"):
+                    reported_items.append(item)
     storage.save_reported_urls(today, reported_items)
     print(f"   已报道 URL 记录: {len(reported_items)} 条")
 
@@ -235,6 +236,30 @@ def handler(event, context):
             "top3": len(top3),
         }, ensure_ascii=False),
     }
+
+
+def _find_cluster_by_title(title: str, clusters: List[Dict]) -> Optional[Dict]:
+    """用关键词重叠匹配 top3 标题和 cluster event_title，避免 LLM 改措辞导致匹配失败。"""
+    if not title or not clusters:
+        return None
+    title_kw = set(re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]{2,}", title.lower()))
+    if not title_kw:
+        return None
+
+    best_match = None
+    best_overlap = 0.0
+    for c in clusters:
+        event_title = c.get("event_title", "")
+        event_kw = set(re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]{2,}", event_title.lower()))
+        if not event_kw:
+            continue
+        overlap = len(title_kw & event_kw) / len(title_kw)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_match = c
+
+    # 重叠 >= 50% 认为是同一个
+    return best_match if best_overlap >= 0.5 else None
 
 
 def _error_response(date: str, stage: str, error: str) -> Dict:

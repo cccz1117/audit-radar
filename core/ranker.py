@@ -29,8 +29,9 @@ class Ranker:
     def _format_candidates(self, candidates: List[Dict]) -> str:
         lines = ["候选列表（已通过粗筛和共振验证）："]
         for i, c in enumerate(candidates, 1):
+            summary_text = (c["items"][0].get("summary", "")[:300] if c.get("items") else "N/A")
             lines.append(
-                f"[{i}] {c['event_title']} | 来源:{','.join(c['sources'])} | 类别:{c['categories']} | 共振分:{c.get('resonance_score',0)} | 摘要:{c['items'][0].get('summary','')[:300]}"
+                f"[{i}] {c['event_title']} | 来源:{','.join(c['sources'])} | 类别:{c['categories']} | 共振分:{c.get('resonance_score',0)} | 摘要:{summary_text}"
             )
         return "\n".join(lines)
 
