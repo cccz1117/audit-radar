@@ -2,8 +2,7 @@
 """阿里云 FC 函数入口。编排：采集 → 粗筛 → 共振 → 精排 → 生成 → 发送。"""
 import json
 from datetime import datetime
-import re
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import config
 
@@ -125,10 +124,9 @@ def handler(event, context):
     try:
         screened, deep_dive_candidates = selector.screen(enriched_candidates)
     except Exception as e:
-        print(f"   [FAIL] 粗筛 LLM 失败: {e}")
+        print(f"   [FAIL] 粗筛失败: {e}")
         storage.record_push(today, "daily_pipeline", "failed", f"selector: {e}")
         return _error_response(today, "selector_failed", str(e))
-    print(f"   日报保留: {len(screened)} 条 | 深度池候选: {len(deep_dive_candidates)} 条")
     storage.save_screened(today, screened)
     if deep_dive_candidates:
         storage.save_deep_dive_candidates(today, deep_dive_candidates)
@@ -169,16 +167,20 @@ def handler(event, context):
         print(f"   [FAIL] 精排 LLM 失败: {e}")
         storage.record_push(today, "daily_pipeline", "failed", f"ranker: {e}")
         return _error_response(today, "ranker_failed", str(e))
-    top3 = result.get("top3", [])
-    print(f"   Top 3: {len(top3)} 条")
-    for t in top3:
-        print(f"   • [{t.get('line','')}] {t.get('title','')}")
+    selected_indices = result.get("selected_indices", [])
+    print(f"   Top 8: {len(selected_indices)} 条（前 5 个用于日报）")
+    for i, idx in enumerate(selected_indices):
+        if idx < len(clusters):
+            c = clusters[idx]
+            line = c['categories'][0] if c.get('categories') else 'general'
+            marker = " [日报]" if i < 5 else ""
+            print(f"   • [{line}] {c['event_title']}{marker}")
 
     # 5. 生成
     _skill_log("GEN", "report-generator")
     generator = Generator()
     try:
-        html = generator.generate(top3, clusters)
+        html = generator.generate(selected_indices, clusters)
     except Exception as e:
         print(f"   [FAIL] 生成 LLM 失败: {e}")
         storage.record_push(today, "daily_pipeline", "failed", f"generator: {e}")
@@ -187,23 +189,22 @@ def handler(event, context):
     storage.save_report(
         today,
         {
-            "top3": top3,
+            "selected_indices": selected_indices,
             "summary": result.get("summary", ""),
             "html": html,
             "status": "draft",
         },
     )
 
-    # 5.5 记录已报道 URL，用于未来跨天去重
+    # 5.5 记录已报道 URL，用于未来跨天去重（记录全部 8 个 cluster 的 items）
     reported_items = []
-    for t in top3:
-        matched = _find_cluster_by_title(t.get("title", ""), clusters)
-        if matched:
-            for item in matched.get("items", []):
+    for idx in selected_indices:
+        if idx < len(clusters):
+            for item in clusters[idx].get("items", []):
                 if item.get("link"):
                     reported_items.append(item)
     storage.save_reported_urls(today, reported_items)
-    print(f"   已报道 URL 记录: {len(reported_items)} 条")
+    print(f"   已报道 URL 记录: {len(reported_items)} 条（Top 8 全部记录）")
 
     # 6. 发送
     print("\n[MAIL] 6. 发送邮件...")
@@ -233,33 +234,9 @@ def handler(event, context):
             "deep_dive_candidates": len(deep_dive_candidates),
             "deduped_screened": len(deduped_screened),
             "clusters": len(clusters),
-            "top3": len(top3),
+            "top8": len(selected_indices),
         }, ensure_ascii=False),
     }
-
-
-def _find_cluster_by_title(title: str, clusters: List[Dict]) -> Optional[Dict]:
-    """用关键词重叠匹配 top3 标题和 cluster event_title，避免 LLM 改措辞导致匹配失败。"""
-    if not title or not clusters:
-        return None
-    title_kw = set(re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]{2,}", title.lower()))
-    if not title_kw:
-        return None
-
-    best_match = None
-    best_overlap = 0.0
-    for c in clusters:
-        event_title = c.get("event_title", "")
-        event_kw = set(re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]{2,}", event_title.lower()))
-        if not event_kw:
-            continue
-        overlap = len(title_kw & event_kw) / len(title_kw)
-        if overlap > best_overlap:
-            best_overlap = overlap
-            best_match = c
-
-    # 重叠 >= 50% 认为是同一个
-    return best_match if best_overlap >= 0.5 else None
 
 
 def _error_response(date: str, stage: str, error: str) -> Dict:

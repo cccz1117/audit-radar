@@ -14,9 +14,9 @@ class Ranker:
         self.system_prompt = load_skill_prompt("audit-news-ranker")
 
     def rank(self, candidates: List[Dict]) -> Dict:
-        """输入共振后的候选，返回 Top3 + Top8 + summary。"""
+        """输入共振后的候选，返回 selected_indices + summary。"""
         if not candidates:
-            return {"top3": [], "top8": [], "summary": "当日无有效候选"}
+            return {"selected_indices": [], "summary": "当日无有效候选"}
         user_prompt = self._format_candidates(candidates)
         resp = chat_completion(
             system=self.system_prompt,
@@ -27,8 +27,8 @@ class Ranker:
         return self._parse_results(resp, candidates)
 
     def _format_candidates(self, candidates: List[Dict]) -> str:
-        lines = ["候选列表（已通过粗筛和共振验证）："]
-        for i, c in enumerate(candidates, 1):
+        lines = ["候选列表（已通过粗筛和共振验证），每个候选前面有 [i] 编号。请选出 8 个最值得报道的候选，按优先级排序（前 5 个用于生成日报正文）："]
+        for i, c in enumerate(candidates):
             summary_text = (c["items"][0].get("summary", "")[:300] if c.get("items") else "N/A")
             lines.append(
                 f"[{i}] {c['event_title']} | 来源:{','.join(c['sources'])} | 类别:{c['categories']} | 共振分:{c.get('resonance_score',0)} | 摘要:{summary_text}"
@@ -37,12 +37,10 @@ class Ranker:
 
     def _parse_results(self, raw: str, candidates: List[Dict]) -> Dict:
         parsed = safe_json_parse(raw)
-        if parsed:
+        if parsed and isinstance(parsed.get("selected_indices"), list):
             return parsed
         print(f"  ⚠️ Ranker JSON parse failed, fallback")
-        top3 = candidates[:3]
         return {
-            "top3": [{"rank": i+1, "line": c["categories"][0] if c.get("categories") else "general", "title": c["event_title"], "industry_value": "high"} for i, c in enumerate(top3)],
-            "top8": [],
-            "summary": "Fallback: 按共振分直接取前3",
+            "selected_indices": list(range(min(8, len(candidates)))),
+            "summary": "Fallback: 按共振分直接取前8",
         }

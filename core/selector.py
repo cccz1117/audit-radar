@@ -14,17 +14,49 @@ class Selector:
         self.system_prompt = load_skill_prompt("rss-audit-screener")
 
     def screen(self, candidates: List[Dict]) -> tuple[List[Dict], List[Dict]]:
-        """输入候选池，返回 (日报保留, 深度池候选)。"""
+        """输入候选池，分批处理，每批最多 100 条，返回 (日报保留, 深度池候选)。"""
         if not candidates:
             return [], []
-        user_prompt = self._format_candidates(candidates)
-        resp = chat_completion(
-            system=self.system_prompt,
-            user=user_prompt,
-            task="screen",
-            timeout=60,
-        )
-        return self._parse_results(resp, candidates)
+
+        BATCH_SIZE = 100
+        all_kept = []
+        all_deep = []
+        total = len(candidates)
+
+        for batch_start in range(0, total, BATCH_SIZE):
+            batch = candidates[batch_start : batch_start + BATCH_SIZE]
+            batch_num = batch_start // BATCH_SIZE + 1
+            batch_total = (total + BATCH_SIZE - 1) // BATCH_SIZE
+            print(f"  [FILTER batch {batch_num}/{batch_total}] 处理 {len(batch)} 条候选...")
+
+            user_prompt = self._format_candidates(batch)
+            try:
+                resp = chat_completion(
+                    system=self.system_prompt,
+                    user=user_prompt,
+                    task="screen",
+                    timeout=120,
+                )
+                kept, deep_dive = self._parse_results(resp, batch)
+            except Exception as e:
+                print(f"  ⚠️ 批次 {batch_num} LLM 失败: {e}，fallback 保留该批全部")
+                kept = batch
+                deep_dive = []
+
+            all_kept.extend(kept)
+            all_deep.extend(deep_dive)
+
+        # 深度池去重（按 URL hash）
+        seen = set()
+        deduped_deep = []
+        for c in all_deep:
+            link = c.get("link", "")
+            if link not in seen:
+                seen.add(link)
+                deduped_deep.append(c)
+
+        print(f"  ✅ 粗筛总计保留: {len(all_kept)} / {total} | 深度池: {len(deduped_deep)}")
+        return all_kept, deduped_deep
 
     def _format_candidates(self, candidates: List[Dict]) -> str:
         lines = []

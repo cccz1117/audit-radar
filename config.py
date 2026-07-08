@@ -39,7 +39,7 @@ ZHIPU_BASE_URL = os.getenv(
 )
 
 # 模型名称（默认走 DeepSeek 官方）
-MODEL_NAME = os.getenv("MODEL_NAME", "ds-v4-flash")
+MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-v4-flash")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.3"))
 MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", "8192"))
 

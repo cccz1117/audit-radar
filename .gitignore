@@ -112,3 +112,23 @@
 **/*.db-journal
 **/*.sqlite3
 **/*.sqlite
+
+# =============================================================================
+# Local pip dependencies & build artifacts (for FC deployment)
+# =============================================================================
+# These are installed by build.py for FC packaging, not project source code.
+*.dist-info/
+_yaml/
+bin/
+certifi/
+charset_normalizer/
+idna/
+python/
+pyyaml-*/
+requests/
+urllib3/
+yaml/
+
+# Build artifacts
+build.py
+my-deploy.zip
