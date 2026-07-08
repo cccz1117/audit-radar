@@ -33,12 +33,12 @@ def _mark_github_repos(candidates: List[Dict], storage, date: str) -> None:
     if not github_repos:
         return
 
-    url_hashes = [hashlib.md5((c.get("link", "") or "").encode("utf-8")).hexdigest() for c in github_repos]
+    url_hashes = [hashlib.sha256((c.get("link", "") or "").encode("utf-8")).hexdigest()[:32] for c in github_repos]
     history = storage.get_repo_history(url_hashes)
 
     new_repo_count = 0
     for c in github_repos:
-        url_hash = hashlib.md5((c.get("link", "") or "").encode("utf-8")).hexdigest()
+        url_hash = hashlib.sha256((c.get("link", "") or "").encode("utf-8")).hexdigest()[:32]
         is_new = url_hash not in history
         c["is_new_repo"] = is_new
         c["repo_stars"] = int(c.get("stars", 0) or 0)

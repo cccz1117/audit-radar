@@ -178,7 +178,14 @@ class SQLiteBackend(StorageBackend):
         self._init_db()
 
     def _conn(self):
-        return sqlite3.connect(self.db_path)
+        # NAS (NFS) 适配：增加 timeout 应对网络延迟；WAL 模式减少锁竞争
+        conn = sqlite3.connect(
+            self.db_path,
+            timeout=10,               # 等待锁释放最多 10 秒
+            check_same_thread=False,  # FC 调用可能跨线程
+        )
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
 
     def _init_db(self):
         with self._conn() as conn:
@@ -192,7 +199,7 @@ class SQLiteBackend(StorageBackend):
 
     @staticmethod
     def _url_hash(link: str) -> str:
-        return hashlib.md5(link.encode("utf-8")).hexdigest() if link else ""
+        return hashlib.sha256(link.encode("utf-8")).hexdigest()[:32] if link else ""
 
     @staticmethod
     def _now() -> str:

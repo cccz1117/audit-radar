@@ -65,6 +65,7 @@ MAIL_TO_LIST = os.getenv("MAIL_TO_LIST", "").split(",") if os.getenv("MAIL_TO_LI
 MAIL_FROM = os.getenv("MAIL_FROM", MAIL_USER)
 
 # ── 存储 ──
+# 本地开发：默认 data/audit.db；FC 生产环境：通过环境变量指向 NAS 路径
 AUDIT_DB_PATH = os.getenv("AUDIT_DB_PATH", "data/audit.db")
 
 # ── 路径 ──
