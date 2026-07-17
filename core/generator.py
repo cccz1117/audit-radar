@@ -8,7 +8,7 @@ from core.skill_loader import load_skill_prompt
 
 
 class Generator:
-    """AI 情报日报生成器。"""
+    """IT 监管日报生成器。"""
 
     def __init__(self):
         self.system_prompt = load_skill_prompt("report-generator")

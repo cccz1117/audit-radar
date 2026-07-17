@@ -154,7 +154,7 @@ def handler(event, context):
     else:
         sender = Sender()
         try:
-            sender.send(html, subject=f"AI审计情报周报 · {week_id}")
+            sender.send(html, subject=f"IT 监管周报 · {week_id}")
             storage.record_push(week_id, channel, "success")
             sent = True
             print("   [OK] 发送成功")

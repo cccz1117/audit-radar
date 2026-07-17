@@ -9,7 +9,7 @@ AI 行业情报自动监控系统：每日从 27 个信源采集候选，经 LLM
 ```
 采集 Fetcher → URL 跨天去重 → 论文入库/富化 → LLM 粗筛 Selector
 → Jaccard 内容去重（灰区可选 AI）→ 多源共振 ResonanceDetector
-→ LLM 精排 Ranker（Top 8）→ LLM 生成 Generator（8 选 5，HTML）
+→ LLM 精排 Ranker（Top 8）→ LLM 生成 Generator（8 选 3-5，HTML）
 → 记录已报道 URL → SMTP 发送 Sender（当日防重）
 ```
 

@@ -214,7 +214,7 @@ def handler(event, context):
     else:
         sender = Sender()
         try:
-            sender.send(html, subject="AI情报日报")
+            sender.send(html, subject="IT 监管日报")
             storage.record_push(today, channel, "success")
             print("   [OK] 发送成功")
         except Exception as e:

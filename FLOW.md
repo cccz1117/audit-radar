@@ -42,7 +42,7 @@ flowchart TD
     end
 
     subgraph Phase5["5. 精排层"]
-        F1[LLM 精排<br/>audit-news-ranker<br/>选出 Top 8] --> F2["前 5 → 日报正文<br/>后 3 → 备选"]
+        F1[LLM 精排<br/>audit-news-ranker<br/>选出 Top 8] --> F2["前 3-5 → 日报正文<br/>其余 → 备选"]
     end
 
     subgraph Phase6["6. 生成与发送层"]
@@ -185,7 +185,7 @@ Jaccard > 0.8  → 直接过滤
 | AI 去重开关 | `DEDUP_USE_AI` | `false` | 灰色地带是否启用 LLM 判断 |
 | 共振 AI 开关 | `RESONANCE_USE_AI` | — | 多源 cluster 是否启用 LLM 精评 |
 | 粗筛批次大小 | — | 100 | 硬编码于 `selector.py` |
-| 精排输出数量 | — | Top 8 | 硬编码于 `ranker.py`，前 5 生成日报 |
+| 精排输出数量 | — | Top 8 | 硬编码于 `ranker.py`，前 3-5 生成日报 |
 | RSS 单源上限 | `RSS_MAX_ITEMS` | 20 | 每个 RSS 源最多抓取条数 |
 | NVD 单页数量 | `NVD_RESULTS_PER_PAGE` | 10 | NVD API 每页返回条数 |
 
@@ -308,13 +308,13 @@ Audit Radar 的日报流水线中嵌入 **4 个 LLM Skill**，按执行顺序依
 - 候选不足 8 个时，有多少选多少
 - 独家信源单源消息：权威付费媒体可保留，标注"独家信源，尚未形成多源共振"
 
-**与下游衔接**：`selected_indices` 前 5 个传递给 `report-generator` 生成日报正文，后 3 个作为备选。全部 8 个的 items 写入 `reported_urls` 表。
+**与下游衔接**：`selected_indices` 传递给 `report-generator`，由生成器从中选 3-5 条生成日报正文，其余作为备选。全部 8 个的 items 写入 `reported_urls` 表。
 
 ---
 
 ### 4. report-generator（日报生成器）
 
-**定位**：AI 行业情报写手。从 8 条素材中选出 5 条，转化为结构化情报专报 HTML。
+**定位**：AI 行业情报写手。从 8 条素材中选出 3-5 条，转化为结构化情报专报 HTML。
 
 **输入**：`selected_indices`（8 个索引） + `clusters`（完整事件簇列表）。
 
@@ -324,7 +324,7 @@ Audit Radar 的日报流水线中嵌入 **4 个 LLM Skill**，按执行顺序依
 
 | 规则 | 说明 |
 |------|------|
-| **从 8 选 5** | 按叙事完整性、主题多样性、安全/监管优先、信息密度选出 5 条 |
+| **从 8 选 3-5** | 按叙事完整性、主题多样性、安全/监管优先、信息密度选出 3-5 条 |
 | **叙事模式 80/20** | 80% 平铺直叙（直接陈述事实）；20% 深层逻辑（仅在安全/治理/商业模式/范式转移时触发 `insight-box`） |
 | **审计视角** | 最多 1~2 条，对 IT 审计/合规有警示意义时生成 `audit-box`，不硬凑 |
 | **去掉量化信号** | ❌ 不出现 HN 分数、GitHub star 数等社区指标；✅ 可提及具体技术参数（如"降本 70%"）作为事实陈述 |
@@ -333,7 +333,7 @@ Audit Radar 的日报流水线中嵌入 **4 个 LLM Skill**，按执行顺序依
 | **标题中文为主** | 公司名/产品名/技术名保留英文，标题和正文主体用中文 |
 | **字数控制** | 每条故事 300~600 字（含可选 insight-box 和 audit-box） |
 
-**HTML 结构**：`header`（标题+日期）→ `story` × 5（标题 + meta + 正文 + 可选 insight-box + 可选 audit-box）→ `footer`。CSS 内联在 `<style>` 中，不依赖外部样式表。
+**HTML 结构**：`header`（标题+日期）→ `story` × 3-5（标题 + meta + 正文 + 可选 insight-box + 可选 audit-box）→ `footer`。CSS 内联在 `<style>` 中，不依赖外部样式表。
 
 **与下游衔接**：HTML 输出直接传递给 `Sender.send()` 发送邮件，同时保存到 `reports` 表。
 

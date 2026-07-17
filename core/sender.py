@@ -28,7 +28,7 @@ class Sender:
     def _build_text_footer() -> str:
         return (
             "\n\n---\n"
-            "【AI 情报日报】由 Audit Radar 自动生成\n"
+            "【IT 监管日报】由 Audit Radar 自动生成\n"
             f"发件人：{config.MAIL_FROM}\n"
             "本邮件仅供信息参考，不构成任何投资或业务建议。"
         )
@@ -38,13 +38,13 @@ class Sender:
         return (
             '<div style="margin-top:32px;padding-top:12px;border-top:1px solid #ddd;'
             'text-align:center;color:#999;font-size:12px;line-height:1.6;">'
-            "<p>【AI 情报日报】由 Audit Radar 自动生成</p>"
+            "<p>【IT 监管日报】由 Audit Radar 自动生成</p>"
             f'<p>发件人：{config.MAIL_FROM}</p>'
             "<p>本邮件仅供信息参考，不构成任何投资或业务建议。</p>"
             "</div>"
         )
 
-    def send(self, html_body: str, subject: str = "AI情报日报") -> None:
+    def send(self, html_body: str, subject: str = "IT 监管日报") -> None:
         if not config.MAIL_HOST or not config.MAIL_USER or not config.MAIL_TO_LIST:
             raise RuntimeError(
                 "邮件未配置：MAIL_HOST, MAIL_USER, MAIL_TO_LIST 至少一个缺失。"
