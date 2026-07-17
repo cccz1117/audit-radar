@@ -151,6 +151,15 @@ def chat_completion(
         "max_tokens": max_tok,
     }
 
+    # DeepSeek V4 思考模式控制：默认不干预（让模型用官方默认），
+    # 可配环境变量显式开启 high/max 或关闭 none
+    if provider == "deepseek":
+        effort = config.DEEPSEEK_REASONING_EFFORT
+        if effort in ("high", "max"):
+            payload["reasoning_effort"] = effort
+        elif effort == "none":
+            payload["thinking"] = {"type": "disabled"}
+
     if config.DEBUG:
         print(f"  [DEBUG] LLM call: provider={provider}, model={model_name}, task={task}, input_chars={len(user)}")
 

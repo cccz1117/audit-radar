@@ -51,6 +51,9 @@ MODEL_RANK = os.getenv("MODEL_RANK", "")           # 精排，空则 fallback
 MODEL_GENERATE = os.getenv("MODEL_GENERATE", "")   # 生成，空则 fallback
 MODEL_DEDUP = os.getenv("MODEL_DEDUP", "")         # 去重，空则 fallback
 
+# DeepSeek V4 思考模式控制：默认不开启（disabled），可设为 high/max 开启
+DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "").lower()
+
 # ── 采集 ──
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
 NVD_RESULTS_PER_PAGE = int(os.getenv("NVD_RESULTS_PER_PAGE", "10"))
