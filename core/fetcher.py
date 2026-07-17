@@ -180,15 +180,19 @@ class Fetcher:
     def _fetch_rss(self, src: Dict) -> List[Dict]:
         """RSS 信源通用抓取。支持提取 category 标签。"""
         timeout = src.get("timeout", config.REQUEST_TIMEOUT)
-        # 对 The Information 使用浏览器 UA 降低 Cloudflare 拦截概率
-        ua = (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-            if "theinformation.com" in src.get("url", "")
-            else "AuditRadar/1.0"
-        )
+        # 部分站点（The Information / CISA）有反爬或 WAF 过滤，使用完整浏览器请求头降低拦截概率
+        browser_ua_domains = ("theinformation.com", "cisa.gov")
+        if any(d in src.get("url", "") for d in browser_ua_domains):
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+        else:
+            headers = {"User-Agent": "AuditRadar/1.0"}
         resp = self._request_with_retry(
             src["url"],
-            headers={"User-Agent": ua},
+            headers=headers,
             timeout=timeout,
         )
         root = ET.fromstring(resp.content)

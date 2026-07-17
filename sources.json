@@ -21,7 +21,7 @@
       "type": "rss",
       "category": "papers",
       "url": "https://plink.anyfeeder.com/weixin/almosthuman2014",
-      "weight": 8,
+      "weight": 2,
       "enabled": true
     },
     {
@@ -29,7 +29,7 @@
       "type": "rss",
       "category": "papers",
       "url": "https://www.qbitai.com/rss",
-      "weight": 8,
+      "weight": 2,
       "enabled": true
     },
     {
@@ -225,6 +225,22 @@
       "category": "tech",
       "url": "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=20",
       "weight": 7,
+      "enabled": true
+    },
+    {
+      "name": "CISA",
+      "type": "rss",
+      "category": "regulatory",
+      "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+      "weight": 9,
+      "enabled": true
+    },
+    {
+      "name": "Solidot",
+      "type": "rss",
+      "category": "tech",
+      "url": "https://www.solidot.org/index.rss",
+      "weight": 5,
       "enabled": true
     }
   ]

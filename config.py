@@ -77,3 +77,5 @@ SOURCES_PATH = os.path.join(os.path.dirname(__file__), "sources.json")
 # ── 调试 ──
 DEBUG = _bool_env("DEBUG", False)
 DEDUP_USE_AI = _bool_env("DEDUP_USE_AI", False)
+# 共振层 LLM 精评开关：开启后多源事件簇走 cross-source-resonance skill，关闭走本地规则
+RESONANCE_USE_AI = _bool_env("RESONANCE_USE_AI", False)

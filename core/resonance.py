@@ -13,12 +13,9 @@ from core.skill_loader import load_skill_prompt
 class ResonanceDetector:
     """事件聚类 + 共振评分。"""
 
-    # 高权重信源，本地评分时额外加分
-    HIGH_WEIGHT_SOURCES = {
-        "Risk.net", "Finextra", "DataCenterDynamics",
-        "nvd-high", "nvd-critical",
-        "The Information", "WIRED AI", "AlphaSignal",
-    }
+    # 高权重阈值：信源 weight ≥ 8 时，本地共振评分额外加分
+    HIGH_WEIGHT_THRESHOLD = 8
+    HIGH_WEIGHT_BONUS = 5
 
     def detect(self, candidates: List[Dict]) -> List[Dict]:
         """输入粗筛后的候选，输出聚类后的事件簇（含共振分）。"""
@@ -54,8 +51,10 @@ class ResonanceDetector:
                 if len(kw_i & kw_j) >= 2:
                     group.append(candidates[j])
                     used.add(j)
+            # 事件代表标题取簇内 weight 最高源的条目，避免随机首条标题质量不稳
+            rep = max(group, key=lambda x: int(x.get("weight", 5) or 5))
             clusters.append({
-                "event_title": c["title"],
+                "event_title": rep["title"],
                 "items": group,
                 "sources": list({x["source"] for x in group}),
                 "categories": list({x["category"] for x in group}),
@@ -71,11 +70,24 @@ class ResonanceDetector:
         return set(words)
 
     def _calc_score(self, cluster: Dict) -> int:
-        """本地规则计算共振分。"""
+        """本地规则计算共振分：独立信源数 × 10 + 高权重源（weight≥阈值）加分。
+
+        权重取自 sources.json 中每个信源的 weight 字段（随 item 携带），
+        同一信源有多条 item 时取其最高 weight。
+        """
         sources = cluster.get("sources", [])
         n = len(sources)
         base = n * 10
-        bonus = sum(5 for s in sources if s in self.HIGH_WEIGHT_SOURCES)
+        source_weights: Dict[str, int] = {}
+        for item in cluster.get("items", []):
+            s = item.get("source", "")
+            w = int(item.get("weight", 5) or 5)
+            source_weights[s] = max(source_weights.get(s, 0), w)
+        bonus = sum(
+            self.HIGH_WEIGHT_BONUS
+            for w in source_weights.values()
+            if w >= self.HIGH_WEIGHT_THRESHOLD
+        )
         return base + bonus
 
     @staticmethod
