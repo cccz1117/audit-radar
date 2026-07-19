@@ -220,3 +220,25 @@ def safe_json_parse(text: str) -> Optional[dict]:
         return json.loads(t)
     except json.JSONDecodeError:
         return None
+
+
+def strip_code_fence(text: str) -> str:
+    """剥离 LLM 输出首尾的 markdown 代码围栏（```html ... ```）。
+
+    用于 HTML 等纯文本产物：邮件正文中残留 ``` 会导致部分邮箱网关
+    解析异常（拒收或消息头丢失），必须在生成层剥掉。
+    仅处理整体包裹的情况；正文中不含代码围栏时原样返回。
+    """
+    t = text.strip()
+    if not t.startswith("```"):
+        return t
+    # 去掉首行围栏（```html / ```HTML / ```）
+    nl = t.find("\n")
+    if nl == -1:
+        return t.strip("`").strip()
+    t = t[nl + 1:]
+    # 去掉结尾围栏
+    end = t.rstrip()
+    if end.endswith("```"):
+        t = end[:-3]
+    return t.strip()

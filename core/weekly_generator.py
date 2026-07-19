@@ -3,7 +3,7 @@
 import json
 from typing import List, Dict
 
-from core.llm_client import chat_completion
+from core.llm_client import chat_completion, strip_code_fence
 import config
 
 
@@ -44,10 +44,11 @@ class WeeklyGenerator:
         top3 = sorted_candidates[:3]
         user_prompt = json.dumps({"deep_dive_top3": top3}, ensure_ascii=False, indent=2)
 
-        return chat_completion(
+        resp = chat_completion(
             system=self.SYSTEM_PROMPT,
             user=user_prompt,
             task="generate",
             temperature=0.5,
             timeout=180,
         )
+        return strip_code_fence(resp)

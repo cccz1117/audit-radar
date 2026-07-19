@@ -3,7 +3,7 @@
 import json
 from typing import Dict, List
 
-from core.llm_client import chat_completion
+from core.llm_client import chat_completion, strip_code_fence
 from core.skill_loader import load_skill_prompt
 
 
@@ -23,7 +23,12 @@ class Generator:
             temperature=0.5,
             timeout=60,
         )
-        return resp
+        html = strip_code_fence(resp)
+        if html != resp.strip():
+            print("  [WARN] LLM 输出携带 markdown 代码围栏，已剥离")
+        if not html.lstrip().startswith("<"):
+            print("  [WARN] 生成结果疑似非 HTML（未以 < 开头），请检查本次输出")
+        return html
 
     def _build_prompt(self, selected_indices: List[int], clusters: List[Dict]) -> str:
         enriched = []
