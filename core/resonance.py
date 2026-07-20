@@ -10,7 +10,14 @@ from core.skill_loader import load_skill_prompt
 
 # jieba 用于中文关键词提取；缺失时回退到整段中文 token（旧行为），不影响运行
 try:
+    import jieba
     import jieba.analyse
+    from pathlib import Path
+
+    # 加载领域用户词典（半导体/AI/银行/监管/信安/银行 IT 实体），文件缺失则跳过
+    _user_dict = Path(__file__).resolve().parent.parent / "domain_dict.txt"
+    if _user_dict.exists():
+        jieba.load_userdict(str(_user_dict))
     _JIEBA_OK = True
 except ImportError:
     _JIEBA_OK = False
