@@ -184,6 +184,7 @@ Jaccard > 0.8  → 直接过滤
 | 内容去重窗口 | — | 7 天 | 硬编码于 `index.py` |
 | AI 去重开关 | `DEDUP_USE_AI` | `false` | 灰色地带是否启用 LLM 判断 |
 | 共振 AI 开关 | `RESONANCE_USE_AI` | — | 多源 cluster 是否启用 LLM 精评 |
+| 共振精评模型 | `MODEL_RESONANCE` | `deepseek-v4-pro` | 共振 LLM 精评路由（走统一 LLM Client） |
 | 粗筛批次大小 | — | 100 | 硬编码于 `selector.py` |
 | 精排输出数量 | — | Top 8 | 硬编码于 `ranker.py`，前 3-5 生成日报 |
 | RSS 单源上限 | `RSS_MAX_ITEMS` | 20 | 每个 RSS 源最多抓取条数 |
@@ -209,7 +210,7 @@ Audit Radar 的日报流水线中嵌入 **4 个 LLM Skill**，按执行顺序依
 | # | Skill 名称 | 流程阶段 | 代码入口 | 模型默认 | 触发条件 |
 |---|-----------|---------|---------|---------|---------|
 | 1 | `rss-audit-screener` | Phase 3 粗筛 | `core.selector:Selector.screen` | `MODEL_SCREEN` fallback `MODEL_NAME` | 每日必执行 |
-| 2 | `cross-source-resonance` | Phase 4 共振精评 | `core.resonance:ResonanceDetector._llm_score_cluster` | `MODEL_NAME`（当前硬编码走百炼 API） | 多源 cluster 且 `RESONANCE_USE_AI=true` |
+| 2 | `cross-source-resonance` | Phase 4 共振精评 | `core.resonance:ResonanceDetector._llm_score_cluster` | `MODEL_RESONANCE`（默认 `deepseek-v4-pro`） | 多源 cluster 且 `RESONANCE_USE_AI=true` |
 | 3 | `audit-news-ranker` | Phase 5 精排 | `core.ranker:Ranker.rank` | `MODEL_RANK` fallback `MODEL_NAME` | 每日必执行 |
 | 4 | `report-generator` | Phase 6 生成 | `core.generator:Generator.generate` | `MODEL_GENERATE` fallback `MODEL_NAME` | 每日必执行 |
 
@@ -352,7 +353,7 @@ def load_skill_prompt(skill_name: str) -> str:
 
 运行时：
 1. `Selector.screen()` 加载 `rss-audit-screener` 的 system prompt + 格式化后的候选列表 → 调用 LLM
-2. `ResonanceDetector._llm_score_cluster()` 加载 `cross-source-resonance` 的 system prompt + 格式化后的事件簇 → 调用百炼 API
+2. `ResonanceDetector._llm_score_cluster()` 加载 `cross-source-resonance` 的 system prompt + 格式化后的事件簇 → 统一走 `chat_completion(task="resonance")`，默认路由 DeepSeek deepseek-v4-pro
 3. `Ranker.rank()` 加载 `audit-news-ranker` 的 system prompt + 格式化后的候选列表 → 调用 LLM
 4. `Generator.generate()` 加载 `report-generator` 的 system prompt + JSON 化的素材 → 调用 LLM
 

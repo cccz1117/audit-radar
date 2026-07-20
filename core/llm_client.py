@@ -7,8 +7,8 @@
 
 配置方式：
   1. 全局默认：LLM_PROVIDER + MODEL_NAME
-  2. 任务级覆盖：MODEL_SCREEN=deepseek:ds-v4-pro
-  3. 模型名简写（自动推断）：MODEL_RANK=ds-v4-pro
+  2. 任务级覆盖：MODEL_SCREEN=deepseek:deepseek-v4-pro
+  3. 模型名简写（自动推断供应商）：MODEL_RANK=deepseek-v4-pro
 
 供应商说明：
   - deepseek:  DeepSeek 官方 API（文档解析/筛选/生成任务用）
@@ -49,8 +49,8 @@ PROVIDERS = {
 # ── 模型名前缀 → 供应商自动推断表 ──
 # 写模型名就能自动路由，不需要指定 provider
 MODEL_PREFIX_MAP = {
-    "ds-": "deepseek",          # ds-v4-flash, ds-v4-pro
-    "deepseek-": "deepseek",    # deepseek-v4-flash（兼容旧命名）
+    "deepseek-": "deepseek",    # deepseek-v4-flash / deepseek-v4-pro（官方模型 ID）
+    "ds-": "deepseek",          # 兼容旧缩写（注意：官方 API 不接受 ds- 开头的模型名）
     "kimi-": "moonshot",        # kimi-k2-6
     "glm-": "zhipu",            # glm-4-flash
 }
@@ -68,10 +68,10 @@ def _resolve_model(task: str = "") -> tuple[str, str]:
     """解析当前任务该用哪个供应商和模型。
 
     优先级：
-      1. 任务级环境变量（如 MODEL_SCREEN=deepseek:ds-v4-pro 或 MODEL_SCREEN=ds-v4-pro）
+      1. 任务级环境变量（如 MODEL_SCREEN=deepseek:deepseek-v4-pro 或 MODEL_SCREEN=deepseek-v4-pro）
       2. 根据模型名前缀自动推断供应商
       3. 全局 LLM_PROVIDER + MODEL_NAME
-      4. 默认值 deepseek + ds-v4-flash
+      4. 默认值 deepseek + deepseek-v4-flash
 
     返回：(provider, model_name)
     """
@@ -80,15 +80,16 @@ def _resolve_model(task: str = "") -> tuple[str, str]:
         "rank": config.MODEL_RANK,
         "generate": config.MODEL_GENERATE,
         "dedup": config.MODEL_DEDUP,
+        "resonance": config.MODEL_RESONANCE,
     }.get(task, "")
 
     if task_env:
         if ":" in task_env:
-            # 显式指定供应商：deepseek:ds-v4-pro
+            # 显式指定供应商：deepseek:deepseek-v4-pro
             provider, model = task_env.split(":", 1)
             return provider.strip(), model.strip()
         else:
-            # 只写模型名：ds-v4-pro → 自动推断供应商
+            # 只写模型名：deepseek-v4-pro → 自动推断供应商
             return _infer_provider(task_env), task_env.strip()
 
     # 走全局默认

@@ -4,10 +4,16 @@ import json
 import re
 from typing import Dict, List
 
-import requests
-
 import config
+from core.llm_client import chat_completion
 from core.skill_loader import load_skill_prompt
+
+# jieba 用于中文关键词提取；缺失时回退到整段中文 token（旧行为），不影响运行
+try:
+    import jieba.analyse
+    _JIEBA_OK = True
+except ImportError:
+    _JIEBA_OK = False
 
 
 class ResonanceDetector:
@@ -16,6 +22,12 @@ class ResonanceDetector:
     # 高权重阈值：信源 weight ≥ 8 时，本地共振评分额外加分
     HIGH_WEIGHT_THRESHOLD = 8
     HIGH_WEIGHT_BONUS = 5
+
+    # 中文新闻标题模板词，聚类时从关键词中剔除（防"华为发布X/苹果发布X"式误聚）
+    ZH_STOPWORDS = {
+        "发布", "推出", "宣布", "全新", "最新", "新一代",
+        "正式", "上线", "独家", "曝光", "回应", "产品",
+    }
 
     def detect(self, candidates: List[Dict]) -> List[Dict]:
         """输入粗筛后的候选，输出聚类后的事件簇（含共振分）。"""
@@ -63,11 +75,22 @@ class ResonanceDetector:
 
     @staticmethod
     def _extract_keywords(title: str) -> set:
-        """提取关键词（英文、中文、数字混合）。"""
+        """提取关键词：英文/数字按单词切，中文用 jieba TF-IDF 关键词。
+
+        extract_tags 自带 IDF 降权，公司名/产品名/漏洞编号等实体词优先，
+        "发布/最新"等模板词被自然过滤；jieba 缺失时回退旧行为。
+        """
         title = title.lower()
-        # 保留 2+ 字符的词
-        words = re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]{2,}", title)
-        return set(words)
+        words = set(re.findall(r"[a-z0-9]+", title))
+        if _JIEBA_OK:
+            zh = jieba.analyse.extract_tags(title, topK=10)
+            words |= {
+                w for w in zh
+                if len(w) >= 2 and not w.isascii() and w not in ResonanceDetector.ZH_STOPWORDS
+            }
+        else:
+            words |= set(re.findall(r"[\u4e00-\u9fff]{2,}", title))
+        return words
 
     def _calc_score(self, cluster: Dict) -> int:
         """本地规则计算共振分：独立信源数 × 10 + 高权重源（weight≥阈值）加分。
@@ -101,19 +124,24 @@ class ResonanceDetector:
         return "none"
 
     def _llm_score_cluster(self, cluster: Dict) -> None:
-        """调用 cross-source-resonance skill 对多源 cluster 做精评。"""
-        if not config.DASHSCOPE_API_KEY:
-            cluster["resonance_score"] = self._calc_score(cluster)
-            cluster["level"] = self._level(cluster["resonance_score"])
-            cluster["consistency_check"] = "skipped"
-            cluster["consistency_note"] = "DASHSCOPE_API_KEY not set, fallback to local score"
-            return
+        """调用 cross-source-resonance skill 对多源 cluster 做精评。
 
+        统一走 chat_completion（task="resonance"），默认路由到 DeepSeek deepseek-v4-pro；
+        可用 MODEL_RESONANCE 环境变量覆盖（如 "moonshot:kimi-k2-6"）。
+        LLM 不可用或输出异常时，自动回退本地规则打分。
+        """
         system_prompt = load_skill_prompt("cross-source-resonance")
         user_prompt = self._format_cluster_for_llm(cluster)
 
         try:
-            raw = self._call_llm(system_prompt, user_prompt)
+            raw = chat_completion(
+                system=system_prompt,
+                user=user_prompt,
+                task="resonance",
+                temperature=0.0,
+                max_tokens=1024,
+                timeout=60,
+            )
             scored = self._parse_llm_output(raw)
         except Exception as e:
             if config.DEBUG:
@@ -148,30 +176,6 @@ class ResonanceDetector:
             lines.append(f"    摘要：{item.get('summary', '')[:300]}")
             lines.append("")
         return "\n".join(lines)
-
-    def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
-        """调用百炼 API。"""
-        headers = {
-            "Authorization": f"Bearer {config.DASHSCOPE_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": config.MODEL_NAME,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": 0.0,
-            "max_tokens": 1024,
-        }
-        r = requests.post(
-            f"{config.DASHSCOPE_BASE_URL}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=60,
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
 
     @staticmethod
     def _parse_llm_output(raw: str) -> Dict:

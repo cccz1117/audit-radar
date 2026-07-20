@@ -44,12 +44,13 @@ MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.3"))
 MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", "8192"))
 
 # 模型路由：不同任务可用不同模型
-# 格式：provider:model_name，如 "deepseek:ds-v4-pro" / "moonshot:kimi-k2-6"
-# 也支持简写：只写模型名（如 "ds-v4-pro"），自动推断供应商
+# 格式：provider:model_name，如 "deepseek:deepseek-v4-pro" / "moonshot:kimi-k2-6"
+# 也支持简写：只写模型名（如 "deepseek-v4-pro"），自动推断供应商
 MODEL_SCREEN = os.getenv("MODEL_SCREEN", "")       # 粗筛，空则 fallback 到 MODEL_NAME
 MODEL_RANK = os.getenv("MODEL_RANK", "")           # 精排，空则 fallback
 MODEL_GENERATE = os.getenv("MODEL_GENERATE", "")   # 生成，空则 fallback
 MODEL_DEDUP = os.getenv("MODEL_DEDUP", "")         # 去重，空则 fallback
+MODEL_RESONANCE = os.getenv("MODEL_RESONANCE", "deepseek-v4-pro")   # 共振精评，默认 DeepSeek V4 Pro
 
 # DeepSeek V4 思考模式控制：默认不开启（disabled），可设为 high/max 开启
 DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "").lower()

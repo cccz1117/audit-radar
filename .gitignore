@@ -123,6 +123,7 @@ bin/
 certifi/
 charset_normalizer/
 idna/
+jieba/
 python/
 pyyaml-*/
 requests/

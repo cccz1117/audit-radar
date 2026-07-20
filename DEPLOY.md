@@ -67,7 +67,7 @@
 |----------|--------|------|
 | `AUDIT_DB_PATH` | `/mnt/audit-radar/data/audit.db` | 数据库路径，默认就是 NAS 路径 |
 | `LLM_PROVIDER` | `deepseek` | 默认使用 DeepSeek 官方 API |
-| `MODEL_NAME` | `ds-v4-flash` | 默认模型 |
+| `MODEL_NAME` | `deepseek-v4-flash` | 默认模型（DeepSeek 官方模型 ID，勿用 ds- 缩写） |
 | `DEEPSEEK_API_KEY` | `sk-...` | DeepSeek 官方 API Key |
 | `MOONSHOT_API_KEY` | `sk-...` | Moonshot API Key（可选） |
 | `MAIL_HOST` | `smtpdm.aliyun.com` | 阿里云 DirectMail SMTP |
