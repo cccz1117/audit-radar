@@ -21,7 +21,7 @@
     {
       "name": "机器之心",
       "type": "rss",
-      "category": "papers",
+      "category": "tech_media",
       "url": "https://plink.anyfeeder.com/weixin/almosthuman2014",
       "weight": 2,
       "enabled": true
@@ -29,7 +29,7 @@
     {
       "name": "量子位",
       "type": "rss",
-      "category": "papers",
+      "category": "tech_media",
       "url": "https://www.qbitai.com/rss",
       "weight": 2,
       "enabled": true
@@ -37,7 +37,7 @@
     {
       "name": "Forrester Risk Management",
       "type": "rss",
-      "category": "regulatory",
+      "category": "tech_media",
       "url": "https://www.forrester.com/blogs/category/risk-management/feed/",
       "weight": 8,
       "enabled": true
@@ -45,7 +45,7 @@
     {
       "name": "Cisco",
       "type": "rss",
-      "category": "papers",
+      "category": "security",
       "url": "https://blogs.cisco.com/feed",
       "weight": 7,
       "enabled": true
@@ -53,7 +53,7 @@
     {
       "name": "MIT Tech Review",
       "type": "rss",
-      "category": "papers",
+      "category": "tech_media",
       "url": "https://www.technologyreview.com/feed/",
       "weight": 7,
       "enabled": true
@@ -61,7 +61,7 @@
     {
       "name": "Lobsters",
       "type": "rss",
-      "category": "geopolitical",
+      "category": "security",
       "url": "https://lobste.rs/rss",
       "weight": 4,
       "enabled": true
@@ -69,7 +69,7 @@
     {
       "name": "晚点聊 LateTalk",
       "type": "rss",
-      "category": "papers",
+      "category": "podcast",
       "url": "https://feeds.fireside.fm/latetalk/rss",
       "weight": 7,
       "report_cycle": "weekly",
@@ -79,7 +79,7 @@
     {
       "name": "张小珺Jùn｜商业访谈录",
       "type": "rss",
-      "category": "papers",
+      "category": "podcast",
       "url": "https://feed.xyzfm.space/dk4yh3pkpjp3",
       "weight": 7,
       "report_cycle": "weekly",
@@ -89,7 +89,7 @@
     {
       "name": "厚雪长波",
       "type": "rss",
-      "category": "regulatory",
+      "category": "podcast",
       "url": "https://proxy.wavpub.com/snowball.xml",
       "weight": 7,
       "report_cycle": "weekly",
@@ -99,7 +99,7 @@
     {
       "name": "Hacker News: Front Page",
       "type": "rss",
-      "category": "papers",
+      "category": "community",
       "url": "https://hnrss.org/frontpage",
       "weight": 6,
       "family": "hn",
@@ -108,7 +108,7 @@
     {
       "name": "Hacker News: Best",
       "type": "rss",
-      "category": "papers",
+      "category": "community",
       "url": "https://hnrss.org/best",
       "weight": 6,
       "family": "hn",
@@ -162,7 +162,7 @@
     {
       "name": "cccz1117 Scour",
       "type": "rss",
-      "category": "papers",
+      "category": "community",
       "url": "https://scour.ing/@cccz1117/rss.xml?t=1d&all_feeds=true",
       "weight": 6,
       "enabled": true
@@ -171,7 +171,7 @@
       "name": "财联社电报",
       "type": "newsnow",
       "source_id": "cls-telegraph",
-      "category": "regulatory",
+      "category": "finance",
       "weight": 2,
       "enabled": true
     },
@@ -179,7 +179,7 @@
       "name": "华尔街见闻快讯",
       "type": "newsnow",
       "source_id": "wallstreetcn-quick",
-      "category": "regulatory",
+      "category": "finance",
       "weight": 2,
       "enabled": true
     },
@@ -187,7 +187,7 @@
       "name": "HackerNews",
       "type": "newsnow",
       "source_id": "hackernews",
-      "category": "papers",
+      "category": "community",
       "weight": 6,
       "family": "hn",
       "enabled": true
@@ -195,7 +195,7 @@
     {
       "name": "WIRED AI",
       "type": "rss",
-      "category": "tech",
+      "category": "tech_media",
       "url": "https://www.wired.com/feed/tag/ai/latest/rss",
       "weight": 7,
       "enabled": true
@@ -203,7 +203,7 @@
     {
       "name": "AlphaSignal",
       "type": "rss",
-      "category": "tech",
+      "category": "tech_media",
       "url": "https://alphasignal.ai/feed.xml",
       "weight": 8,
       "enabled": true
@@ -211,7 +211,7 @@
     {
       "name": "Techmeme",
       "type": "rss",
-      "category": "tech",
+      "category": "tech_media",
       "url": "https://www.techmeme.com/feed.xml",
       "weight": 7,
       "enabled": true
@@ -219,7 +219,7 @@
     {
       "name": "Hacker News: Front Page (Algolia)",
       "type": "api",
-      "category": "tech",
+      "category": "community",
       "url": "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=20",
       "weight": 6,
       "family": "hn",
@@ -236,7 +236,7 @@
     {
       "name": "Solidot",
       "type": "rss",
-      "category": "tech",
+      "category": "security",
       "url": "https://www.solidot.org/index.rss",
       "weight": 5,
       "enabled": true
