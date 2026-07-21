@@ -66,7 +66,7 @@ MAIL_HOST = os.getenv("MAIL_HOST", "")
 MAIL_PORT = int(os.getenv("MAIL_PORT", "465"))
 MAIL_USER = os.getenv("MAIL_USER", "")
 MAIL_PASS = os.getenv("MAIL_PASS", "")
-MAIL_TO_LIST = os.getenv("MAIL_TO_LIST", "").split(",") if os.getenv("MAIL_TO_LIST") else []
+MAIL_TO_LIST = [m.strip() for m in os.getenv("MAIL_TO_LIST", "").split(",") if m.strip()]
 MAIL_FROM = os.getenv("MAIL_FROM", MAIL_USER)
 
 # ── 存储 ──
