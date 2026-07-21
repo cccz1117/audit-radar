@@ -85,9 +85,11 @@ def dedup_pipeline(
     逻辑：
       1. URL 去重：url_filter_fn(url_hash) 返回 True → 过滤
       2. Jaccard 内容去重（基于摘要）：
-         - < 0.2 → 直接保留
-         - > 0.8 → 直接过滤
-         - 0.2~0.8 → AI 判断（use_ai=True 时）
+         - < 0.35 → 直接保留（同主题不同事件的字符 bigram 重合常落在 0.2~0.35，
+           阈值过低会把整个 AI 新闻池误判为重复）
+         - > 0.8  → 直接过滤（近乎实锤的重复）
+         - 0.35~0.8 → AI 判断（use_ai=True 时）；AI 未启用时保守【保留】——
+           灰区误杀的代价（候选池腰斩）远大于偶发重复（聚类层还能合并）
 
     返回格式兼容 index.py：
         {
@@ -116,6 +118,7 @@ def dedup_pipeline(
     jaccard_filtered = []
     jaccard_kept = []
     ai_kept = []
+    sim_stats = []  # 相似度分布，供阈值校准
 
     for c in url_kept:
         max_sim = 0.0
@@ -130,7 +133,8 @@ def dedup_pipeline(
                 max_sim = sim
                 closest_past = p
 
-        if max_sim < 0.2:
+        sim_stats.append(max_sim)
+        if max_sim < 0.35:
             jaccard_kept.append(c)
         elif max_sim > 0.8:
             jaccard_filtered.append(c)
@@ -142,8 +146,14 @@ def dedup_pipeline(
                 else:
                     ai_kept.append(c)
             else:
-                # AI 未启用或无历史数据：保守过滤
-                jaccard_filtered.append(c)
+                # AI 未启用：保守保留（误杀代价 > 偶发重复，聚类层兜底）
+                jaccard_kept.append(c)
+
+    if sim_stats:
+        sim_stats.sort()
+        n = len(sim_stats)
+        print(f"  相似度分布: p50={sim_stats[n//2]:.2f} "
+              f"p90={sim_stats[int(n*0.9)]:.2f} max={sim_stats[-1]:.2f}")
 
     final_kept = jaccard_kept + ai_kept
 
