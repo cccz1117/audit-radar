@@ -1,6 +1,17 @@
 # -*- coding: utf-8 -*-
 """集中配置管理。所有密钥从环境变量读取，适配阿里云 FC 与本地测试。"""
 import os
+from datetime import datetime, timedelta, timezone
+
+
+# 业务统一使用北京时间（UTC+8，naive）：FC 容器系统时钟是 UTC，
+# 若直接用 datetime.now()，北京早上 7 点的运行会被记到前一天的日期键下
+BJ_TZ = timezone(timedelta(hours=8))
+
+
+def now_bj() -> datetime:
+    """返回北京时间的 naive datetime，替代所有 datetime.now() 调用点。"""
+    return datetime.now(BJ_TZ).replace(tzinfo=None)
 
 
 def _bool_env(key: str, default: bool = False) -> bool:

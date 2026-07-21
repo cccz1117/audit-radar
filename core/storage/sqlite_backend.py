@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from .base import StorageBackend
+import config as _config  # now_bj：业务统一北京时间
 
 
 SCHEMA = """
@@ -208,7 +209,7 @@ class SQLiteBackend(StorageBackend):
 
     @staticmethod
     def _now() -> str:
-        return datetime.now().isoformat()
+        return _config.now_bj().isoformat()
 
     def save_candidates(self, date: str, candidates: List[Dict]) -> None:
         with self._conn() as conn:
@@ -465,7 +466,7 @@ class SQLiteBackend(StorageBackend):
             return False
         from datetime import datetime, timedelta
 
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        cutoff = (_config.now_bj() - timedelta(days=days)).strftime("%Y-%m-%d")
         with self._conn() as conn:
             row = conn.execute(
                 """
@@ -480,7 +481,7 @@ class SQLiteBackend(StorageBackend):
         """获取最近 N 天已报道的新闻标题和摘要，用于内容相似度去重。"""
         from datetime import datetime, timedelta
 
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        cutoff = (_config.now_bj() - timedelta(days=days)).strftime("%Y-%m-%d")
         with self._conn() as conn:
             rows = conn.execute(
                 """
@@ -775,7 +776,7 @@ class SQLiteBackend(StorageBackend):
         """按标题关键词搜索最近 N 天的论文（关键词之间是 AND 关系）。"""
         from datetime import datetime, timedelta
 
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        cutoff = (_config.now_bj() - timedelta(days=days)).strftime("%Y-%m-%d")
         keywords = [k.strip() for k in title.lower().split() if len(k.strip()) >= 2]
         if not keywords:
             return []

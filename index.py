@@ -65,7 +65,7 @@ def _skill_log(step: str, skill_name: str) -> None:
 
 def handler(event, context):
     """阿里云 FC HTTP 触发 / 定时触发入口。"""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = config.now_bj().strftime("%Y-%m-%d")
     storage = SQLiteBackend(db_path=DEFAULT_DB_PATH)
 
     print("=" * 50)

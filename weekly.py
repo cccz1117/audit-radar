@@ -22,7 +22,7 @@ DEFAULT_DB_PATH = config.AUDIT_DB_PATH
 def _iso_week_id(d: datetime = None) -> str:
     """生成 ISO 周标识，例如 2026-W27。"""
     if d is None:
-        d = datetime.now()
+        d = config.now_bj()
     year, week, _ = d.isocalendar()
     return f"{year}-W{week:02d}"
 
@@ -79,7 +79,7 @@ def _transcribe_audio_pseudocode(audio_url: str) -> str:
 
 def handler(event, context):
     """阿里云 FC HTTP/定时触发入口。"""
-    today = datetime.now()
+    today = config.now_bj()
     week_id = _iso_week_id(today)
     storage = SQLiteBackend(db_path=DEFAULT_DB_PATH)
 
