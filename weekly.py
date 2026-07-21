@@ -139,13 +139,7 @@ def handler(event, context):
         },
     )
 
-    # 4. 标记已处理
-    processed_hashes = [c.get("url_hash", "") for c in week_candidates if c.get("url_hash")]
-    if processed_hashes:
-        storage.update_deep_dive_status(processed_hashes, "processed", week_id=week_id)
-        print(f"   已标记处理: {len(processed_hashes)} 条")
-
-    # 5. 发送邮件
+    # 4. 发送邮件
     print("\n[MAIL] 4. 发送周报邮件...")
     channel = "email"
     sent = False
@@ -162,6 +156,14 @@ def handler(event, context):
             storage.record_push(week_id, channel, "failed", str(e))
             print(f"   [FAIL] 发送失败: {e}")
             raise
+
+    # 5. 标记已处理：仅在发送成功（或此前已推送）后执行。
+    # 发送失败时保持 pending，下次运行仍会拾取，避免素材静默丢失。
+    if sent or storage.is_pushed(week_id, channel):
+        processed_hashes = [c.get("url_hash", "") for c in week_candidates if c.get("url_hash")]
+        if processed_hashes:
+            storage.update_deep_dive_status(processed_hashes, "processed", week_id=week_id)
+            print(f"   已标记处理: {len(processed_hashes)} 条")
 
     print("\n[OK] Audit Radar Weekly Report 完成")
     return {

@@ -174,7 +174,10 @@ class SQLiteBackend(StorageBackend):
 
     def __init__(self, db_path: str = "data/audit.db"):
         self.db_path = db_path
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        # db_path 可能是裸文件名（无目录部分），此时 makedirs("") 会抛 FileNotFoundError
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
         self._init_db()
 
     def _conn(self):

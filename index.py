@@ -170,7 +170,7 @@ def handler(event, context):
     selected_indices = result.get("selected_indices", [])
     print(f"   Top 8: {len(selected_indices)} 条（前 5 个用于日报）")
     for i, idx in enumerate(selected_indices):
-        if idx < len(clusters):
+        if 0 <= idx < len(clusters):
             c = clusters[idx]
             line = c['categories'][0] if c.get('categories') else 'general'
             marker = " [日报]" if i < 5 else ""
@@ -199,7 +199,7 @@ def handler(event, context):
     # 5.5 记录已报道 URL，用于未来跨天去重（记录全部 8 个 cluster 的 items）
     reported_items = []
     for idx in selected_indices:
-        if idx < len(clusters):
+        if 0 <= idx < len(clusters):
             for item in clusters[idx].get("items", []):
                 if item.get("link"):
                     reported_items.append(item)
