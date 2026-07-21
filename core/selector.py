@@ -20,7 +20,7 @@ class Selector:
     """AI 行业情报粗筛器。"""
 
     BATCH_SIZE = 100      # 每批候选数（受输入 token 限制，不宜再大）
-    SCORE_FLOOR = 25      # 全局分数线：五维总分 ≥ 25 才有资格进池（与 SKILL.md 一致）
+    SCORE_FLOOR = 15      # 全局分数线：yes 且 ≥15 进全局排名（25 误杀压线条目，15 召回优先）
     GLOBAL_TOP_N = 80     # 全局名额：进下游（去重/聚类/精排）的最大条数
     FALLBACK_MAX = 30     # 启发式兜底时单批最多保留条数
 
