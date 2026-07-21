@@ -85,10 +85,10 @@ def dedup_pipeline(
     逻辑：
       1. URL 去重：url_filter_fn(url_hash) 返回 True → 过滤
       2. Jaccard 内容去重（基于摘要）：
-         - < 0.35 → 直接保留（同主题不同事件的字符 bigram 重合常落在 0.2~0.35，
+         - < 0.5  → 直接保留（同主题不同事件的字符 bigram 重合多落在 0.5 以下，
            阈值过低会把整个 AI 新闻池误判为重复）
          - > 0.8  → 直接过滤（近乎实锤的重复）
-         - 0.35~0.8 → AI 判断（use_ai=True 时）；AI 未启用时保守【保留】——
+         - 0.5~0.8 → AI 判断（use_ai=True 时）；AI 未启用时保守【保留】——
            灰区误杀的代价（候选池腰斩）远大于偶发重复（聚类层还能合并）
 
     返回格式兼容 index.py：
@@ -134,7 +134,7 @@ def dedup_pipeline(
                 closest_past = p
 
         sim_stats.append(max_sim)
-        if max_sim < 0.35:
+        if max_sim < 0.5:
             jaccard_kept.append(c)
         elif max_sim > 0.8:
             jaccard_filtered.append(c)
