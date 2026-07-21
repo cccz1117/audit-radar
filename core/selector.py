@@ -51,7 +51,13 @@ class Selector:
                     task="screen",
                     timeout=120,
                 )
-                self._annotate_batch(resp, batch)
+                matched, salvaged = self._annotate_batch(resp, batch)
+                # 截断抢救且覆盖率过低：未标注条目不能静默丢弃，走启发式打分
+                unannotated = [c for c in batch if "keep" not in c]
+                if salvaged and matched < len(batch) * 0.5 and unannotated:
+                    print(f"  ⚠️ 批次覆盖率过低（{matched}/{len(batch)}），"
+                          f"未标注 {len(unannotated)} 条转启发式兜底")
+                    self._heuristic_fallback(unannotated)
             except Exception as e:
                 print(f"  ⚠️ 批次 {batch_num} LLM 失败: {e}，启用启发式兜底")
                 self._heuristic_fallback(batch)
@@ -91,12 +97,13 @@ class Selector:
 
     # ── 批次标注 ──
 
-    def _annotate_batch(self, raw: str, batch: List[Dict]) -> None:
+    def _annotate_batch(self, raw: str, batch: List[Dict]) -> Tuple[int, bool]:
         """把 LLM 结果写回候选 item（keep/total_score/dimension_scores/reason 等）。
 
         匹配优先用 index（输入编号，1 起）；模型不遵医嘱时回退标题精确匹配。
         不使用子串匹配——空 title 恒真错配，改写标题会丢失结果。
         未被模型返回的条目保持 keep 未设置（= 不保留）。
+        返回 (命中条数, 是否走了截断抢救路径)。
         """
         results, salvaged = self._parse_llm_array(raw)
 
@@ -132,6 +139,7 @@ class Selector:
 
         tag = "（截断抢救）" if salvaged else ""
         print(f"  ✅ 批次标注{tag}: 命中 {matched} / {len(batch)}")
+        return matched, salvaged
 
     @staticmethod
     def _parse_llm_array(raw: str) -> Tuple[List[Dict], bool]:

@@ -17,6 +17,7 @@
   - zhipu:     智谱 GLM（保留代码，暂不启用）
 """
 import json
+import os
 import time
 from typing import Optional
 
@@ -159,10 +160,14 @@ def chat_completion(
         "max_tokens": max_tok,
     }
 
-    # DeepSeek V4 思考模式控制：默认不干预（让模型用官方默认），
-    # 可配环境变量显式开启 high/max 或关闭 none
+    # DeepSeek V4 思考模式控制：思考 token 与正文共享 max_tokens，
+    # 批量粗活（screen/dedup/resonance）开思考会挤占正文预算导致输出截断甚至空响应，
+    # 因此这些任务默认关闭思考；可用 DEEPSEEK_REASONING_EFFORT_<TASK> 按任务覆盖，
+    # 全局 DEEPSEEK_REASONING_EFFORT 作为兜底（high/max 开启、none 关闭）。
     if provider == "deepseek":
-        effort = config.DEEPSEEK_REASONING_EFFORT
+        task_effort = os.getenv(f"DEEPSEEK_REASONING_EFFORT_{task.upper()}", "") if task else ""
+        effort = (task_effort or config.DEEPSEEK_REASONING_EFFORT
+                  or ("none" if task in ("screen", "dedup", "resonance") else "")).lower()
         if effort in ("high", "max"):
             payload["reasoning_effort"] = effort
         elif effort == "none":
@@ -217,7 +222,14 @@ def chat_completion(
     except (KeyError, IndexError) as e:
         raise RuntimeError(f"LLM 响应格式异常: {data}")
 
+    # finish_reason=length 即输出被 max_tokens 截断（思考 token 也会计入），
+    # 是排查空响应/半截 JSON 的关键信号；content 为空时无论 DEBUG 都警告
+    finish = choices[0].get("finish_reason", "")
+    if not content:
+        print(f"  ⚠️ LLM 返回空内容（finish_reason={finish}，疑似思考 token 占满输出预算）")
     if config.DEBUG:
+        usage = data.get("usage", {})
+        print(f"  [DEBUG] finish_reason={finish} usage={usage}")
         print(f"  [DEBUG] LLM output: {content[:500]}")
 
     return content
