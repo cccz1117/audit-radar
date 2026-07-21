@@ -145,6 +145,10 @@ def chat_completion(
     temp = temperature if temperature is not None else config.MODEL_TEMPERATURE
     max_tok = max_tokens if max_tokens is not None else config.MODEL_MAX_TOKENS
 
+    # Kimi K3 官方限制 temperature 只能为 1，其他值直接报错；强制覆盖
+    if provider == "moonshot" and "k3" in model_name.lower():
+        temp = 1.0
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
