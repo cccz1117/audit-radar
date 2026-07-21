@@ -127,7 +127,7 @@ clusters 覆盖全部输入编号，每组至少一个元素。"""
             user="\n".join(lines),
             task="cluster",
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,
             timeout=60,
         )
         parsed = safe_json_parse(raw)

@@ -172,7 +172,7 @@ def chat_completion(
     if provider == "deepseek":
         task_effort = os.getenv(f"DEEPSEEK_REASONING_EFFORT_{task.upper()}", "") if task else ""
         effort = (task_effort or config.DEEPSEEK_REASONING_EFFORT
-                  or ("none" if task in ("screen", "dedup", "resonance") else "")).lower()
+                  or ("none" if task in ("screen", "dedup", "resonance", "cluster") else "")).lower()
         if effort in ("high", "max"):
             payload["reasoning_effort"] = effort
         elif effort == "none":

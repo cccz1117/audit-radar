@@ -62,7 +62,7 @@ class DedupAI:
                 user=user_prompt,
                 task="dedup",
                 temperature=0.0,
-                max_tokens=100,
+                max_tokens=300,
                 timeout=30,
             )
             result = safe_json_parse(resp)
