@@ -5,7 +5,7 @@ import re
 from typing import Dict, List
 
 import config
-from core.llm_client import chat_completion
+from core.llm_client import chat_completion, safe_json_parse
 from core.skill_loader import load_skill_prompt
 
 # jieba 用于中文关键词提取；缺失时回退到整段中文 token（旧行为），不影响运行
@@ -37,8 +37,22 @@ class ResonanceDetector:
     }
 
     def detect(self, candidates: List[Dict]) -> List[Dict]:
-        """输入粗筛后的候选，输出聚类后的事件簇（含共振分）。"""
-        clusters = self._cluster(candidates)
+        """输入粗筛后的候选，输出聚类后的事件簇（含共振分）。
+
+        聚类路径：CLUSTER_USE_AI 开启时优先 LLM 事件分组（语义判断，
+        根治停用词误并/中英跨语言不聚），失败回退关键词聚类。
+        打分恒用本地规则（family×10 + 连续权重），与聚类路径无关。
+        """
+        clusters = []
+        if getattr(config, "CLUSTER_USE_AI", False) and len(candidates) >= 2:
+            try:
+                clusters = self._llm_cluster(candidates)
+                print(f"  AI 聚类: {len(clusters)} 个簇")
+            except Exception as e:
+                print(f"  ⚠️ AI 聚类失败: {e}，回退关键词聚类")
+                clusters = []
+        if not clusters:
+            clusters = self._cluster(candidates)
         for cluster in clusters:
             if getattr(config, "RESONANCE_USE_AI", False) and len(cluster.get("sources", [])) >= 2:
                 # 多源 cluster 用 LLM 做一致性校验和精评
@@ -70,15 +84,73 @@ class ResonanceDetector:
                 if len(kw_i & kw_j) >= 2:
                     group.append(candidates[j])
                     used.add(j)
-            # 事件代表标题取簇内 weight 最高源的条目，避免随机首条标题质量不稳
-            rep = max(group, key=lambda x: int(x.get("weight", 5) or 5))
-            clusters.append({
-                "event_title": rep["title"],
-                "items": group,
-                "sources": list({x["source"] for x in group}),
-                "categories": list({x["category"] for x in group}),
-            })
+            clusters.append(self._build_cluster(group))
         return clusters
+
+    @staticmethod
+    def _build_cluster(group: List[Dict]) -> Dict:
+        """把一组条目定型为事件簇：代表标题取簇内 weight 最高源的条目。"""
+        rep = max(group, key=lambda x: int(x.get("weight", 5) or 5))
+        return {
+            "event_title": rep["title"],
+            "items": group,
+            "sources": list({x["source"] for x in group}),
+            "categories": list({x["category"] for x in group}),
+        }
+
+    # ── AI 聚类 ──
+
+    _CLUSTER_PROMPT = """\
+你是新闻事件聚类专家。输入是编号的新闻标题列表，请把"报道同一事件"的条目分组。
+
+判断标准：
+- 同一事件：核心事实相同（同一主体、同一动作、同一对象），即使语言、措辞、侧重不同
+- 不同事件：只是同一主题/同一公司的不同新闻，必须分开
+- 中英跨语言报道同一事件 → 必须合并
+- 每条只能属于一个组；独立事件自成一组
+
+输出严格 JSON（不要围栏、不要解释）：
+{"clusters": [[1, 2, 5], [3], [4, 6]]}
+clusters 覆盖全部输入编号，每组至少一个元素。"""
+
+    def _llm_cluster(self, candidates: List[Dict]) -> List[Dict]:
+        """LLM 事件分组：编号标题发给模型，返回索引分组后构建簇。
+
+        未覆盖/越界索引自动修正（漏掉的条目各自成单源簇）。
+        输出格式异常时抛异常，由 detect() 回退关键词聚类。
+        """
+        lines = []
+        for i, c in enumerate(candidates, 1):
+            lines.append(f"[{i}] {c['title']} | 来源:{c['source']}")
+        raw = chat_completion(
+            system=self._CLUSTER_PROMPT,
+            user="\n".join(lines),
+            task="cluster",
+            temperature=0.0,
+            max_tokens=2048,
+            timeout=60,
+        )
+        parsed = safe_json_parse(raw)
+        if not isinstance(parsed, dict) or not isinstance(parsed.get("clusters"), list):
+            raise ValueError(f"AI 聚类输出格式异常: {raw[:200]}")
+
+        n = len(candidates)
+        assigned = set()
+        groups = []
+        for grp in parsed["clusters"]:
+            members = []
+            for idx in grp:
+                if isinstance(idx, int) and 1 <= idx <= n and idx not in assigned:
+                    assigned.add(idx)
+                    members.append(candidates[idx - 1])
+            if members:
+                groups.append(members)
+        # 漏网条目各自成单源簇
+        for idx in range(1, n + 1):
+            if idx not in assigned:
+                groups.append([candidates[idx - 1]])
+
+        return [self._build_cluster(g) for g in groups]
 
     @staticmethod
     def _extract_keywords(title: str) -> set:

@@ -89,6 +89,7 @@ def _resolve_model(task: str = "") -> tuple[str, str]:
         "generate": config.MODEL_GENERATE,
         "dedup": config.MODEL_DEDUP,
         "resonance": config.MODEL_RESONANCE,
+        "cluster": config.MODEL_CLUSTER,
     }.get(task, "")
 
     if task_env:
