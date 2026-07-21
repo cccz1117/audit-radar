@@ -462,8 +462,8 @@ class SQLiteBackend(StorageBackend):
                     pass
             conn.commit()
 
-    def is_recently_reported(self, url_hash: str, days: int = 7) -> bool:
-        """查询 URL 最近 N 天是否已被报道。"""
+    def is_recently_reported(self, url_hash: str, days: int = 7, exclude_date: str = "") -> bool:
+        """查询 URL 最近 N 天是否已被报道。exclude_date 用于测试模式排除当天记录。"""
         if not url_hash:
             return False
         from datetime import datetime, timedelta
@@ -473,14 +473,15 @@ class SQLiteBackend(StorageBackend):
             row = conn.execute(
                 """
                 SELECT 1 FROM reported_urls
-                WHERE url_hash = ? AND date >= ?
+                WHERE url_hash = ? AND date >= ? AND date != ?
                 """,
-                (url_hash, cutoff),
+                (url_hash, cutoff, exclude_date),
             ).fetchone()
         return bool(row)
 
-    def get_recent_report_items(self, days: int = 7) -> List[Dict]:
-        """获取最近 N 天已报道的新闻标题和摘要，用于内容相似度去重。"""
+    def get_recent_report_items(self, days: int = 7, exclude_date: str = "") -> List[Dict]:
+        """获取最近 N 天已报道的新闻标题和摘要，用于内容相似度去重。
+        exclude_date 用于测试模式排除当天记录。"""
         from datetime import datetime, timedelta
 
         cutoff = (_config.now_bj() - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -488,10 +489,10 @@ class SQLiteBackend(StorageBackend):
             rows = conn.execute(
                 """
                 SELECT date, url_hash, title, summary FROM reported_urls
-                WHERE date >= ?
+                WHERE date >= ? AND date != ?
                 ORDER BY date DESC
                 """,
-                (cutoff,),
+                (cutoff, exclude_date),
             ).fetchall()
 
         return [

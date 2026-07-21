@@ -142,20 +142,62 @@ class Selector:
         return matched, salvaged
 
     @staticmethod
-    def _parse_llm_array(raw: str) -> Tuple[List[Dict], bool]:
-        """解析 LLM 返回的 JSON 数组；整体失败时抢救完整闭合的对象。
+    def _extract_balanced_array(t: str) -> Optional[str]:
+        """从第一个 '[' 起提取配平的 JSON 数组文本（字符串感知）。
+        容忍围栏外的汇总句等游离文本；找不到配平右括号时返回 None。"""
+        start = t.find("[")
+        if start == -1:
+            return None
+        depth, in_str, esc = 0, False, False
+        for i in range(start, len(t)):
+            ch = t[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "[":
+                depth += 1
+            elif ch == "]":
+                depth -= 1
+                if depth == 0:
+                    return t[start : i + 1]
+        return None
 
-        返回 (对象列表, 是否走了抢救路径)。抢救路径会打印响应头尾片段便于诊断。
+    @staticmethod
+    def _parse_llm_array(raw: str) -> Tuple[List[Dict], bool]:
+        """解析 LLM 返回的 JSON 数组；失败时逐层降级。
+
+        降级链：整体解析 → 提取配平数组解析（容忍尾部汇总句/围栏）
+        → 逐对象抢救（容忍截断）。返回 (对象列表, 是否走了降级路径)。
         """
         parsed = safe_json_parse(raw)
         if isinstance(parsed, list):
             return [r for r in parsed if isinstance(r, dict)], False
 
-        # 去围栏后扫描平衡括号，逐个抢救完整 JSON 对象（容忍尾部被 max_tokens 截断）
+        # 去围栏
         t = raw.strip()
         if t.startswith("```"):
             nl = t.find("\n")
             t = t[nl + 1:] if nl != -1 else t.strip("`")
+
+        # 降级 1：提取配平数组（模型常在数组后附汇总句，整体解析必挂）
+        arr = Selector._extract_balanced_array(t)
+        if arr:
+            try:
+                parsed = json.loads(arr)
+                if isinstance(parsed, list):
+                    print(f"  ⚠️ 整体解析失败，已从围栏/汇总文本中提取数组（{len(parsed)} 条）")
+                    return [r for r in parsed if isinstance(r, dict)], True
+            except json.JSONDecodeError:
+                pass
+
+        # 降级 2：逐对象抢救（容忍尾部被 max_tokens 截断）
         objs: List[Dict] = []
         start = t.find("[")
         if start != -1:

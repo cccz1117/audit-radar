@@ -227,10 +227,12 @@ def chat_completion(
         raise RuntimeError(f"LLM 响应格式异常: {data}")
 
     # finish_reason=length 即输出被 max_tokens 截断（思考 token 也会计入），
-    # 是排查空响应/半截 JSON 的关键信号；content 为空时无论 DEBUG 都警告
+    # 是排查空响应/半截 JSON 的关键信号；异常情况无论 DEBUG 都告警
     finish = choices[0].get("finish_reason", "")
     if not content:
         print(f"  ⚠️ LLM 返回空内容（finish_reason={finish}，疑似思考 token 占满输出预算）")
+    elif finish and finish != "stop":
+        print(f"  ⚠️ LLM finish_reason 异常: {finish}（输出可能被截断）")
     if config.DEBUG:
         usage = data.get("usage", {})
         print(f"  [DEBUG] finish_reason={finish} usage={usage}")

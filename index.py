@@ -100,10 +100,12 @@ def handler(event, context):
 
     storage.save_candidates(today, candidates)
 
-    # 1.5 URL 跨天去重（粗筛）
+    # 1.5 URL 跨天去重（粗筛）。IS_TEST 排除当天记录：避免正式运行的已报道
+    # 记忆污染测试（测试应模拟"全新一天"的去重视角）
+    dedup_exclude = today if config.IS_TEST else ""
     url_dedup_result = dedup_pipeline(
         candidates, [],
-        lambda h: storage.is_recently_reported(h, days=7),
+        lambda h: storage.is_recently_reported(h, days=7, exclude_date=dedup_exclude),
         [],
         use_ai=False,
     )
@@ -134,8 +136,8 @@ def handler(event, context):
         storage.save_deep_dive_candidates(today, deep_dive_candidates)
         print(f"   已保存 {len(deep_dive_candidates)} 条到深度挖掘队列")
 
-    # 2.5 内容相似度跨天去重（Jaccard + 可选 AI）
-    past_items = storage.get_recent_report_items(days=7)
+    # 2.5 内容相似度跨天去重（Jaccard + 可选 AI）。IS_TEST 同样排除当天记录
+    past_items = storage.get_recent_report_items(days=7, exclude_date=dedup_exclude)
     use_ai = config.DEDUP_USE_AI
     dedup_result = dedup_pipeline(
         [], screened,
