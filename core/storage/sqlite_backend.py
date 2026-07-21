@@ -254,6 +254,8 @@ class SQLiteBackend(StorageBackend):
 
     def save_screened(self, date: str, screened: List[Dict]) -> None:
         with self._conn() as conn:
+            # screened 是当日中间产物：先清当日再写入，保证 FC 重试/手动重跑幂等
+            conn.execute("DELETE FROM screened WHERE date = ?", (date,))
             for s in screened:
                 conn.execute(
                     """

@@ -95,21 +95,32 @@ E. 时效性（10%）：今日 > 48h 内 > 本周 > 旧闻（>7 天直接 no）
 
 # 输出格式
 
-对每条输入，输出严格 JSON。**用 `index` 引用输入列表中的 [i] 编号，不要复述标题**：
+**每条输入都必须输出一条记录**，用 `index` 引用输入列表的 [i] 编号，不要复述标题。
+
+为控制输出长度，**keep 为 no 的条目只输出三个字段**，禁止输出 reason 等其他内容：
+
+```json
+{"index": 2, "keep": "no", "total_score": 18}
+```
+
+**keep 为 yes / strong 的条目输出完整记录**：
 
 ```json
 {
   "index": 1,
-  "keep": "strong / yes / no",
+  "keep": "strong / yes",
   "deep_dive_candidate": false,
   "deep_dive_reason": "仅当 true 时填写",
   "total_score": 33,
   "dimension_scores": {"A": 8, "B": 6, "C": 7, "D": 3, "E": 9},
   "category": "tech / security / business / infra / regulatory",
   "reason": "一句话理由",
-  "industry_mapping": "行业价值方向"
+  "audit_mapping_guess": "若留，初步猜测的审计方向"
 }
 ```
+
+> **打分纪律**：no 的条目也必须给出真实 total_score——分数将用于跨批次全局排名，不是走过场。
+> **召回优先**：拿不准时倾向保留并给真实分数，相对价值排序由下游精排负责，你的任务是别误杀。
 
 # 使用指令
 
