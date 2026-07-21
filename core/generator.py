@@ -21,7 +21,7 @@ class Generator:
             user=user_prompt,
             task="generate",
             temperature=0.5,
-            timeout=60,
+            timeout=120,
         )
         html = strip_code_fence(resp)
         if html != resp.strip():
