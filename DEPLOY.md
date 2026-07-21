@@ -94,7 +94,7 @@
 | `DEEPSEEK_API_KEY` | DeepSeek 官方 API Key |
 | `MOONSHOT_API_KEY` | Moonshot API Key（可选） |
 | `MAIL_HOST` | SMTP 服务器 |
-| `MAIL_PORT` | SMTP 端口，默认 25 |
+| `MAIL_PORT` | SMTP 端口，默认 465（SSL；阿里云封 outbound 25，勿用 25） |
 | `MAIL_USER` | SMTP 用户名 |
 | `MAIL_PASS` | SMTP 密码 |
 | `MAIL_TO_LIST` | 收件人列表，逗号分隔 |
@@ -114,7 +114,11 @@
 
 > **时区说明**：阿里云 FC 定时触发器的 Cron 默认使用 **UTC 时间**。`0 8 * * *` UTC = 北京时间 **16:00**。如果你想让日报在**北京时间 8:00** 推送，Cron 表达式应写 `0 0 * * *`（UTC 0:00）。请确认时区配置后再保存。
 
-### weekly-job
+### weekly-job（待开发，暂不上线）
+
+> ⚠️ 周报模块仍在开发中，**请勿在 FC 创建该函数或定时触发器**。
+> `weekly.py` 虽随包上传，但没有触发器就不会执行，不影响日报。
+> 以下配置仅为未来上线时的参考。
 
 - Runtime: `python3.11`
 - Handler: `weekly.handler`
@@ -130,7 +134,6 @@
 2. 检查邮件是否收到日报
 3. 检查 NAS 路径下是否生成 `/mnt/audit-radar/data/audit.db`
 4. 运行 1~2 天后检查 `source_status` 表，确认各信源抓取正常
-5. 周六检查周报是否正确生成
 
 ---
 
