@@ -3,8 +3,9 @@
 import json
 import time
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from typing import List, Dict
+from typing import Dict, List, Tuple
 
 import requests
 
@@ -14,72 +15,66 @@ import config
 class Fetcher:
     """统一采集器。"""
 
+    MAX_WORKERS = 8  # 并行采集线程数（网络 IO 密集，信源间无共享状态）
+
     def __init__(self):
         with open(config.SOURCES_PATH, "r", encoding="utf-8") as f:
             self.sources = json.load(f)["sources"]
 
     def fetch_all(self) -> List[Dict]:
         """采集所有启用的信源，返回统一格式候选池。"""
-        candidates = []
-        for src in self.sources:
-            if not src.get("enabled", True):
-                continue
-            try:
-                if src["type"] == "api":
-                    items = self._fetch_api(src)
-                elif src["type"] == "rss":
-                    items = self._fetch_rss(src)
-                elif src["type"] == "newsnow":
-                    items = self._fetch_newsnow(src)
-                else:
-                    print(f"  [WARN] unknown source type '{src.get('type')}' for {src.get('name')}")
-                    continue
-                for item in items:
-                    item["source"] = src["name"]
-                    item["category"] = src.get("category", "general")
-                    item["weight"] = src.get("weight", 5)
-                    item["report_cycle"] = src.get("report_cycle", "daily")
-                    item["content_type"] = src.get("content_type", "article")
-                candidates.extend(items)
-                print(f"  [NET] {src['name']}: {len(items)} items")
-            except Exception as e:
-                print(f"  [WARN] {src['name']} failed: {e}")
-        return candidates
+        return self.fetch_with_status()["candidates"]
 
     def fetch_with_status(self) -> Dict:
-        """采集并返回每个信源的状态，用于监控。"""
-        result = {"candidates": [], "sources": []}
-        for src in self.sources:
-            if not src.get("enabled", True):
-                continue
-            status = {"name": src["name"], "count": 0, "status": "success", "error": ""}
-            try:
-                if src["type"] == "api":
-                    items = self._fetch_api(src)
-                elif src["type"] == "rss":
-                    items = self._fetch_rss(src)
-                elif src["type"] == "newsnow":
-                    items = self._fetch_newsnow(src)
-                else:
-                    status["status"] = "skipped"
-                    status["error"] = f"unknown type {src.get('type')}"
-                    result["sources"].append(status)
-                    continue
-                for item in items:
-                    item["source"] = src["name"]
-                    item["category"] = src.get("category", "general")
-                    item["weight"] = src.get("weight", 5)
-                    item["report_cycle"] = src.get("report_cycle", "daily")
-                    item["content_type"] = src.get("content_type", "article")
-                result["candidates"].extend(items)
-                status["count"] = len(items)
-                print(f"  [NET] {src['name']}: {len(items)} items")
-            except Exception as e:
-                status["status"] = "failed"
-                status["error"] = str(e)
-                print(f"  [WARN] {src['name']} failed: {e}")
+        """并行采集所有启用的信源，返回候选与每个信源状态。
+
+        结果按 sources.json 原始顺序整理，保证候选顺序确定、日志不交错。
+        """
+        enabled = [s for s in self.sources if s.get("enabled", True)]
+        results: Dict[int, Tuple[List[Dict], Dict]] = {}
+        with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as pool:
+            futures = {pool.submit(self._fetch_one, s): i for i, s in enumerate(enabled)}
+            for fut in as_completed(futures):
+                results[futures[fut]] = fut.result()
+
+        result: Dict = {"candidates": [], "sources": []}
+        for i in range(len(enabled)):
+            items, status = results[i]
+            result["candidates"].extend(items)
             result["sources"].append(status)
+            if status["status"] == "success":
+                print(f"  [NET] {status['name']}: {status['count']} items")
+            elif status["status"] == "failed":
+                print(f"  [WARN] {status['name']} failed: {status['error']}")
         return result
+
+    def _fetch_one(self, src: Dict) -> Tuple[List[Dict], Dict]:
+        """抓取单个信源，返回 (items, status)。各信源互相独立，无线程安全问题。"""
+        status = {"name": src["name"], "count": 0, "status": "success", "error": ""}
+        try:
+            if src["type"] == "api":
+                items = self._fetch_api(src)
+            elif src["type"] == "rss":
+                items = self._fetch_rss(src)
+            elif src["type"] == "newsnow":
+                items = self._fetch_newsnow(src)
+            else:
+                status["status"] = "skipped"
+                status["error"] = f"unknown type {src.get('type')}"
+                return [], status
+            for item in items:
+                item["source"] = src["name"]
+                item["category"] = src.get("category", "general")
+                item["weight"] = src.get("weight", 5)
+                item["family"] = src.get("family", src["name"])
+                item["report_cycle"] = src.get("report_cycle", "daily")
+                item["content_type"] = src.get("content_type", "article")
+            status["count"] = len(items)
+            return items, status
+        except Exception as e:
+            status["status"] = "failed"
+            status["error"] = str(e)
+            return [], status
 
     def _fetch_api(self, src: Dict) -> List[Dict]:
         """API 信源（NVD / HF Papers / HN Algolia）。"""

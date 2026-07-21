@@ -56,13 +56,14 @@ MODEL_RESONANCE = os.getenv("MODEL_RESONANCE", "deepseek-v4-pro")   # 共振精�
 DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "").lower()
 
 # ── 采集 ──
-REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "12"))
 NVD_RESULTS_PER_PAGE = int(os.getenv("NVD_RESULTS_PER_PAGE", "10"))
 RSS_MAX_ITEMS = int(os.getenv("RSS_MAX_ITEMS", "20"))
 
 # ── 邮件 ──
+# 注意：阿里云 ECS/FC 默认封禁出方向 25 端口，MAIL_PORT 请用 465（SSL）
 MAIL_HOST = os.getenv("MAIL_HOST", "")
-MAIL_PORT = int(os.getenv("MAIL_PORT", "25"))
+MAIL_PORT = int(os.getenv("MAIL_PORT", "465"))
 MAIL_USER = os.getenv("MAIL_USER", "")
 MAIL_PASS = os.getenv("MAIL_PASS", "")
 MAIL_TO_LIST = os.getenv("MAIL_TO_LIST", "").split(",") if os.getenv("MAIL_TO_LIST") else []

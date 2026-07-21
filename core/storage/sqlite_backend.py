@@ -178,13 +178,15 @@ class SQLiteBackend(StorageBackend):
         self._init_db()
 
     def _conn(self):
-        # NAS (NFS) 适配：增加 timeout 应对网络延迟；WAL 模式减少锁竞争
+        # NAS (NFS) 适配：增加 timeout 应对网络延迟；
+        # journal_mode=DELETE：WAL 依赖共享内存(mmap)，NFS 上多主机并发可能毁库，
+        # 经典回滚日志走普通文件+文件锁，NFS 上安全
         conn = sqlite3.connect(
             self.db_path,
             timeout=10,               # 等待锁释放最多 10 秒
             check_same_thread=False,  # FC 调用可能跨线程
         )
-        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA journal_mode=DELETE")
         return conn
 
     def _init_db(self):

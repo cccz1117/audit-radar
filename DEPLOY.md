@@ -71,12 +71,12 @@
 | `DEEPSEEK_API_KEY` | `sk-...` | DeepSeek 官方 API Key |
 | `MOONSHOT_API_KEY` | `sk-...` | Moonshot API Key（可选） |
 | `MAIL_HOST` | `smtpdm.aliyun.com` | 阿里云 DirectMail SMTP |
-| `MAIL_PORT` | `25` | SMTP 端口 |
+| `MAIL_PORT` | `465` | SMTP 端口（SSL；阿里云封禁出方向 25，勿用 25）|
 | `MAIL_USER` | `audit@mail.news-briefing.xyz` | 发件地址 |
 | `MAIL_PASS` | `...` | SMTP 密码 |
 | `MAIL_TO_LIST` | `your@email.com` | 收件人，逗号分隔 |
 | `MAIL_FROM` | `audit@mail.news-briefing.xyz` | 发件人显示名 |
-| `REQUEST_TIMEOUT` | `30` | HTTP 请求超时 |
+| `REQUEST_TIMEOUT` | `12` | HTTP 请求超时（并行采集后单源超时容忍度更低）|
 | `RSS_MAX_ITEMS` | `20` | 每个 RSS 源最多抓取条数 |
 
 ---
@@ -109,7 +109,7 @@
 - Runtime: `python3.11`
 - Handler: `index.handler`
 - Memory: 512 MB
-- Timeout: 300 秒
+- Timeout: 900 秒
 - 触发器：定时触发，Cron 表达式 `0 8 * * *`
 
 > **时区说明**：阿里云 FC 定时触发器的 Cron 默认使用 **UTC 时间**。`0 8 * * *` UTC = 北京时间 **16:00**。如果你想让日报在**北京时间 8:00** 推送，Cron 表达式应写 `0 0 * * *`（UTC 0:00）。请确认时区配置后再保存。
