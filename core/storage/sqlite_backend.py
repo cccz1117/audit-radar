@@ -308,6 +308,8 @@ class SQLiteBackend(StorageBackend):
 
     def save_clusters(self, date: str, clusters: List[Dict]) -> None:
         with self._conn() as conn:
+            # clusters 是当日中间产物：先清当日再写入，重跑/多次测试不累积
+            conn.execute("DELETE FROM clusters WHERE date = ?", (date,))
             for c in clusters:
                 conn.execute(
                     """

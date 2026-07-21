@@ -71,6 +71,8 @@ def handler(event, context):
     print("=" * 50)
     print("Audit Radar 开始运行")
     print(f"日期: {today} | 数据库: {DEFAULT_DB_PATH}")
+    if config.IS_TEST:
+        print("⚠️  IS_TEST=yes 测试模式：绕过每日一发限制，不写入 reported_urls")
     print("=" * 50)
 
     # 1. 采集
@@ -213,24 +215,29 @@ def handler(event, context):
     )
 
     # 5.5 记录已报道 URL，用于未来跨天去重（记录全部 8 个 cluster 的 items）
-    reported_items = []
-    for idx in selected_indices:
-        if 0 <= idx < len(clusters):
-            for item in clusters[idx].get("items", []):
-                if item.get("link"):
-                    reported_items.append(item)
-    storage.save_reported_urls(today, reported_items)
-    print(f"   已报道 URL 记录: {len(reported_items)} 条（Top 8 全部记录）")
+    # IS_TEST 跳过：测试不消耗"已报道"记忆，保护次日正式运行的去重判断
+    if config.IS_TEST:
+        print("   [TEST] 跳过 reported_urls 写入")
+    else:
+        reported_items = []
+        for idx in selected_indices:
+            if 0 <= idx < len(clusters):
+                for item in clusters[idx].get("items", []):
+                    if item.get("link"):
+                        reported_items.append(item)
+        storage.save_reported_urls(today, reported_items)
+        print(f"   已报道 URL 记录: {len(reported_items)} 条（Top 8 全部记录）")
 
     # 6. 发送
     print("\n[MAIL] 6. 发送邮件...")
-    channel = "email"
-    if storage.is_pushed(today, channel):
+    channel = "email_test" if config.IS_TEST else "email"
+    subject = "[TEST] IT 监管日报" if config.IS_TEST else "IT 监管日报"
+    if not config.IS_TEST and storage.is_pushed(today, channel):
         print(f"   [SKIP] 今日 {channel} 已推送过")
     else:
         sender = Sender()
         try:
-            sender.send(html, subject="IT 监管日报")
+            sender.send(html, subject=subject)
             storage.record_push(today, channel, "success")
             print("   [OK] 发送成功")
         except Exception as e:

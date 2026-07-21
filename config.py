@@ -71,6 +71,11 @@ REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "12"))
 NVD_RESULTS_PER_PAGE = int(os.getenv("NVD_RESULTS_PER_PAGE", "10"))
 RSS_MAX_ITEMS = int(os.getenv("RSS_MAX_ITEMS", "20"))
 
+# ── 测试模式 ──
+# IS_TEST=yes 时：绕过"每日一发"限制、跳过 reported_urls 写入（保护次日去重）、
+# 推送记录写入 email_test 渠道、邮件主题加 [TEST] 前缀。其余环节与正式运行一致。
+IS_TEST = _bool_env("IS_TEST", False)
+
 # ── 邮件 ──
 # 注意：阿里云 ECS/FC 默认封禁出方向 25 端口，MAIL_PORT 请用 465（SSL）
 MAIL_HOST = os.getenv("MAIL_HOST", "")
