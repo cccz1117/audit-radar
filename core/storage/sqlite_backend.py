@@ -192,12 +192,12 @@ class SQLiteBackend(StorageBackend):
     def _init_db(self):
         with self._conn() as conn:
             conn.executescript(SCHEMA)
-            # 兼容旧库：为 reported_urls 增加 summary 字段
-            try:
-                conn.execute("ALTER TABLE reported_urls ADD COLUMN IF NOT EXISTS summary TEXT")
+            # 兼容旧库：为 reported_urls 增加 summary 字段。
+            # SQLite 不支持 ADD COLUMN IF NOT EXISTS，须先用 PRAGMA 检查列是否存在
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(reported_urls)")]
+            if "summary" not in cols:
+                conn.execute("ALTER TABLE reported_urls ADD COLUMN summary TEXT")
                 conn.commit()
-            except sqlite3.OperationalError:
-                pass
 
     @staticmethod
     def _url_hash(link: str) -> str:
@@ -355,7 +355,7 @@ class SQLiteBackend(StorageBackend):
                 (
                     date,
                     self._now(),
-                    json.dumps(report.get("top3", []), ensure_ascii=False),
+                    json.dumps(report.get("top3", report.get("selected_indices", [])), ensure_ascii=False),
                     report.get("summary", ""),
                     report.get("html", ""),
                     report.get("status", "draft"),
