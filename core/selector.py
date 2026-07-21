@@ -59,11 +59,31 @@ class Selector:
         return all_kept, deduped_deep
 
     def _format_candidates(self, candidates: List[Dict]) -> str:
+        """格式化候选为 LLM 输入。除基础字段外，按 skill input_schema 补发
+        report_cycle / content_type / stars / hn_score / categories 等信号字段，
+        仅在字段有值时输出，避免无意义噪音。"""
         lines = []
         for i, c in enumerate(candidates, 1):
-            lines.append(
-                f"[{i}] {c['title']} | 来源:{c['source']} | 日期:{c.get('date','')[:10]} | 摘要:{c.get('summary','')[:300]}"
-            )
+            parts = [
+                f"[{i}] {c['title']}",
+                f"来源:{c['source']}",
+                f"日期:{c.get('date', '')[:10]}",
+            ]
+            if c.get("report_cycle") and c["report_cycle"] != "daily":
+                parts.append(f"周期:{c['report_cycle']}")
+            if c.get("content_type") and c["content_type"] != "article":
+                parts.append(f"类型:{c['content_type']}")
+            if c.get("stars"):
+                parts.append(f"GitHub星标:{c['stars']}")
+            if c.get("is_new_repo"):
+                parts.append("新repo:是")
+            if c.get("hn_score"):
+                parts.append(f"HN热度:{c['hn_score']}")
+            if c.get("categories"):
+                cats = ",".join(c["categories"][:5])
+                parts.append(f"标签:{cats}")
+            parts.append(f"摘要:{c.get('summary', '')[:300]}")
+            lines.append(" | ".join(parts))
         return "\n".join(lines)
 
     def _parse_results(self, raw: str, candidates: List[Dict]) -> tuple[List[Dict], List[Dict]]:

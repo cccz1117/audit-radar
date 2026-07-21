@@ -26,9 +26,9 @@ except ImportError:
 class ResonanceDetector:
     """事件聚类 + 共振评分。"""
 
-    # 高权重阈值：信源 weight ≥ 8 时，本地共振评分额外加分
-    HIGH_WEIGHT_THRESHOLD = 8
-    HIGH_WEIGHT_BONUS = 5
+    # 连续权重加分：family 内最高 weight 超出基准 5 的部分计入加分
+    # （weight 6/7/8/9/10 分别加 1/2/3/4/5 分），消除"≥8 才加分"的阈值断崖
+    BASE_WEIGHT = 5
 
     # 中文新闻标题模板词，聚类时从关键词中剔除（防"华为发布X/苹果发布X"式误聚）
     ZH_STOPWORDS = {
@@ -100,24 +100,19 @@ class ResonanceDetector:
         return words
 
     def _calc_score(self, cluster: Dict) -> int:
-        """本地规则计算共振分：独立信源数 × 10 + 高权重源（weight≥阈值）加分。
+        """本地规则计算共振分：独立 family 数 × 10 + 连续权重加分。
 
-        权重取自 sources.json 中每个信源的 weight 字段（随 item 携带），
-        同一信源有多条 item 时取其最高 weight。
+        同族信源（sources.json 中 family 相同的源，如 nvd-high/nvd-critical、
+        三个 HN 入口）只计为 1 个独立源，避免同一内容切片造成虚假共振。
+        权重加分取每个 family 内最高 weight，超出基准 5 的部分累加。
         """
-        sources = cluster.get("sources", [])
-        n = len(sources)
-        base = n * 10
-        source_weights: Dict[str, int] = {}
+        family_weights: Dict[str, int] = {}
         for item in cluster.get("items", []):
-            s = item.get("source", "")
+            fam = item.get("family") or item.get("source", "")
             w = int(item.get("weight", 5) or 5)
-            source_weights[s] = max(source_weights.get(s, 0), w)
-        bonus = sum(
-            self.HIGH_WEIGHT_BONUS
-            for w in source_weights.values()
-            if w >= self.HIGH_WEIGHT_THRESHOLD
-        )
+            family_weights[fam] = max(family_weights.get(fam, 0), w)
+        base = len(family_weights) * 10
+        bonus = sum(max(0, w - self.BASE_WEIGHT) for w in family_weights.values())
         return base + bonus
 
     @staticmethod
