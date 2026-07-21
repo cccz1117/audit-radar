@@ -22,8 +22,7 @@ output_schema:
   items:
     type: object
     properties:
-      title: {type: string}
-      source: {type: string}
+      index: {type: integer, description: "输入列表中的 [i] 编号，从 1 开始"}
       keep: {type: string, enum: [strong, yes, no]}
       deep_dive_candidate: {type: boolean}
       deep_dive_reason: {type: string}
@@ -96,12 +95,11 @@ E. 时效性（10%）：今日 > 48h 内 > 本周 > 旧闻（>7 天直接 no）
 
 # 输出格式
 
-对每条输入，输出严格 JSON：
+对每条输入，输出严格 JSON。**用 `index` 引用输入列表中的 [i] 编号，不要复述标题**：
 
 ```json
 {
-  "title": "原标题",
-  "source": "来源名称",
+  "index": 1,
   "keep": "strong / yes / no",
   "deep_dive_candidate": false,
   "deep_dive_reason": "仅当 true 时填写",

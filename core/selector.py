@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """大模型粗筛：调用统一 LLM Client，支持多供应商切换。"""
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from core.llm_client import chat_completion, safe_json_parse
 from core.skill_loader import load_skill_prompt
@@ -87,29 +87,43 @@ class Selector:
         return "\n".join(lines)
 
     def _parse_results(self, raw: str, candidates: List[Dict]) -> tuple[List[Dict], List[Dict]]:
-        """解析模型返回的 JSON 数组。兼容 markdown 代码块。"""
+        """解析模型返回的 JSON 数组。兼容 markdown 代码块。
+
+        匹配优先用 index（输入编号，1 起）；模型不遵医嘱时回退标题精确匹配。
+        不再使用子串匹配——空 title 会恒真错配，改写标题会丢失结果。
+        """
         results = safe_json_parse(raw)
         if not isinstance(results, list):
             print(f"  ⚠️ JSON parse failed, fallback to text scan")
             return candidates, []  # 保守：全部保留，无深度池
+
+        def _match(r: Dict) -> Optional[Dict]:
+            idx = r.get("index")
+            if isinstance(idx, int) and 1 <= idx <= len(candidates):
+                return candidates[idx - 1]
+            title = r.get("title", "")
+            if title:  # 空标题绝不参与匹配
+                for c in candidates:
+                    if c["title"] == title:
+                        return c
+            return None
+
         kept = []
         deep_dive = []
         for r in results:
+            c = _match(r)
+            if c is None:
+                continue
             if r.get("keep") in ("strong", "yes"):
-                for c in candidates:
-                    if c["title"] == r.get("title", "") or r.get("title", "") in c["title"]:
-                        c["keep_reason"] = r.get("reason", "")
-                        c["industry_mapping"] = r.get("industry_mapping", "")
-                        c["total_score"] = r.get("total_score", 0)
-                        c["deep_dive_candidate"] = r.get("deep_dive_candidate", False)
-                        c["deep_dive_reason"] = r.get("deep_dive_reason", "")
-                        kept.append(c)
-                        break
+                c["keep_reason"] = r.get("reason", "")
+                c["industry_mapping"] = r.get("industry_mapping", "")
+                c["total_score"] = r.get("total_score", 0)
+                c["deep_dive_candidate"] = r.get("deep_dive_candidate", False)
+                c["deep_dive_reason"] = r.get("deep_dive_reason", "")
+                if c not in kept:
+                    kept.append(c)
             if r.get("deep_dive_candidate") is True:
-                for c in candidates:
-                    if c["title"] == r.get("title", "") or r.get("title", "") in c["title"]:
-                        if c not in deep_dive:
-                            deep_dive.append(c)
-                        break
+                if c not in deep_dive:
+                    deep_dive.append(c)
         print(f"  ✅ 粗筛保留: {len(kept)} / {len(candidates)} | 深度池: {len(deep_dive)}")
         return kept, deep_dive
