@@ -17,11 +17,18 @@
   - zhipu:     智谱 GLM（保留代码，暂不启用）
 """
 import json
+import time
 from typing import Optional
 
 import requests
 
 import config
+
+
+# 瞬时故障重试策略：429/5xx/超时/连接失败可恢复，指数退避后重试
+MAX_RETRIES = 2               # 重试次数（共尝试 1+2=3 次）
+RETRY_BACKOFF = (5, 15)       # 各次重试前等待秒数
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 # ── 供应商配置表 ──
@@ -164,29 +171,35 @@ def chat_completion(
     if config.DEBUG:
         print(f"  [DEBUG] LLM call: provider={provider}, model={model_name}, task={task}, input_chars={len(user)}")
 
-    try:
-        resp = requests.post(
-            f"{base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=timeout,
-        )
-    except requests.exceptions.Timeout as e:
-        raise RuntimeError(f"LLM 请求超时（{timeout}s）: {e}")
-    except requests.exceptions.ConnectionError as e:
-        raise RuntimeError(f"LLM 连接失败，请检查网络或 API 地址: {e}")
+    last_err: Optional[Exception] = None
+    for attempt in range(MAX_RETRIES + 1):
+        if attempt > 0:
+            wait = RETRY_BACKOFF[min(attempt - 1, len(RETRY_BACKOFF) - 1)]
+            print(f"  ↻ LLM 第 {attempt} 次重试（等待 {wait}s）...")
+            time.sleep(wait)
+        try:
+            resp = requests.post(
+                f"{base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=timeout,
+            )
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            # 瞬时网络故障：可重试
+            last_err = RuntimeError(f"LLM 请求超时/连接失败（{timeout}s）: {e}")
+            continue
 
-    # 区分 HTTP 错误状态码
-    if resp.status_code == 401:
-        raise RuntimeError(f"LLM API 认证失败（401）: 请检查 {provider.upper()}_API_KEY 是否正确")
-    if resp.status_code == 429:
-        raise RuntimeError(f"LLM API 速率限制（429）: 请求过于频繁，请稍后重试")
-    if resp.status_code == 500:
-        raise RuntimeError(f"LLM 服务内部错误（500）: 供应商服务端异常，请稍后重试")
-    if resp.status_code == 503:
-        raise RuntimeError(f"LLM 服务不可用（503）: 供应商服务过载或维护中")
-    if resp.status_code >= 400:
-        raise RuntimeError(f"LLM API 错误（{resp.status_code}）: {resp.text[:500]}")
+        # 不可恢复错误：立即失败，不重试
+        if resp.status_code == 401:
+            raise RuntimeError(f"LLM API 认证失败（401）: 请检查 {provider.upper()}_API_KEY 是否正确")
+        if resp.status_code in RETRYABLE_STATUS:
+            last_err = RuntimeError(f"LLM API 瞬时错误（{resp.status_code}）: {resp.text[:200]}")
+            continue
+        if resp.status_code >= 400:
+            raise RuntimeError(f"LLM API 错误（{resp.status_code}）: {resp.text[:500]}")
+        break  # 成功
+    else:
+        raise RuntimeError(f"LLM 请求失败，已重试 {MAX_RETRIES} 次: {last_err}")
 
     # 解析响应 JSON
     try:

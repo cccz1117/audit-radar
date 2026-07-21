@@ -169,6 +169,22 @@ def handler(event, context):
         return _error_response(today, "ranker_failed", str(e))
     selected_indices = result.get("selected_indices", [])
     print(f"   Top 8: {len(selected_indices)} 条（前 5 个用于日报）")
+
+    # 空日报短路：无选中时不生成、不发送，避免 LLM 拿到空列表编造幻觉邮件
+    if not selected_indices:
+        print("   [SKIP] 今日无选中新闻，跳过生成与发送")
+        storage.save_report(
+            today,
+            {"selected_indices": [], "summary": result.get("summary", "今日无有效候选"),
+             "html": "", "status": "empty"},
+        )
+        storage.record_push(today, "daily_pipeline", "skipped", "no news selected")
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"date": today, "status": "empty", "reason": "no news selected"},
+                               ensure_ascii=False),
+        }
     for i, idx in enumerate(selected_indices):
         if 0 <= idx < len(clusters):
             c = clusters[idx]
