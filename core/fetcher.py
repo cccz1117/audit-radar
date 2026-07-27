@@ -17,6 +17,27 @@ class Fetcher:
 
     MAX_WORKERS = 8  # 并行采集线程数（网络 IO 密集，信源间无共享状态）
 
+    @staticmethod
+    def _normalize_date(raw: str) -> str:
+        """把 feed 的原始日期字符串统一为 ISO 格式（YYYY-MM-DDTHH:MM:SS）。
+
+        RSS 源给 RFC-822（"Sat, 25 Jul 2026 12:11:39 +0000"），API 源给 ISO。
+        下游统一按 [:10] 截取，非 ISO 原始串会被截成 "Sat, 25 Ju" 残骸，
+        导致生成环节 LLM 脑补出错误日期（如把 Jul 幻觉成 1月）。
+        解析失败时原样返回（比丢掉信息强）。
+        """
+        raw = (raw or "").strip()
+        if not raw:
+            return ""
+        if raw[:4].isdigit():  # 已是 ISO 格式
+            return raw
+        from email.utils import parsedate_to_datetime
+        try:
+            dt = parsedate_to_datetime(raw)
+            return dt.strftime("%Y-%m-%dT%H:%M:%S")
+        except (TypeError, ValueError):
+            return raw
+
     def __init__(self):
         with open(config.SOURCES_PATH, "r", encoding="utf-8") as f:
             self.sources = json.load(f)["sources"]
@@ -102,7 +123,7 @@ class Fetcher:
             desc = self._extract_description(cve)
             items.append({
                 "title": f"{cve['id']} - {desc[:100]}",
-                "date": cve.get("published", ""),
+                "date": self._normalize_date(cve.get("published", "")),
                 "summary": desc,
                 "link": f"https://nvd.nist.gov/vuln/detail/{cve['id']}",
                 "raw_score": self._extract_cvss(cve),
@@ -133,7 +154,7 @@ class Fetcher:
         for p in papers[: config.RSS_MAX_ITEMS]:
             items.append({
                 "title": p.get("title", ""),
-                "date": p.get("publishedAt", ""),
+                "date": self._normalize_date(p.get("publishedAt", "")),
                 "summary": p.get("summary", ""),
                 "link": f"https://huggingface.co/papers/{p.get('paper', {}).get('id', '')}",
                 "raw_score": 0,
@@ -163,7 +184,7 @@ class Fetcher:
             summary = f"HN {points} 分 | {num_comments} 评论 | 作者 {author}"
             items.append({
                 "title": title,
-                "date": created_at,
+                "date": self._normalize_date(created_at),
                 "summary": summary,
                 "link": link,
                 "raw_score": points,
@@ -223,7 +244,7 @@ class Fetcher:
 
             items.append({
                 "title": title_text,
-                "date": pub_date.text if pub_date is not None else "",
+                "date": self._normalize_date(pub_date.text if pub_date is not None else ""),
                 "summary": summary_text,
                 "link": link.text if link is not None else "",
                 "audio_url": audio_url,
@@ -264,7 +285,7 @@ class Fetcher:
 
                 items.append({
                     "title": title_text,
-                    "date": updated.text if updated is not None else "",
+                    "date": self._normalize_date(updated.text if updated is not None else ""),
                     "summary": summary_text,
                     "link": link.get("href") if link is not None else "",
                     "audio_url": audio_url,
@@ -316,7 +337,7 @@ class Fetcher:
 
             items.append({
                 "title": title,
-                "date": date_str,
+                "date": self._normalize_date(date_str),
                 "summary": summary,
                 "link": item.get("url", ""),
                 "raw_score": 0,
