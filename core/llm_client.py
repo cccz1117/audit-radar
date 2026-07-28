@@ -9,11 +9,14 @@
   1. 全局默认：LLM_PROVIDER + MODEL_NAME
   2. 任务级覆盖：MODEL_SCREEN=deepseek:deepseek-v4-pro
   3. 模型名简写（自动推断供应商）：MODEL_RANK=deepseek-v4-pro
+  4. 模型别名（聚合平台专用）：MODEL_GENERATE=bl-glm-5.2 → 百炼 glm-5.2
+  5. 降级链（逗号串候选，403 配额用尽自动切换）：
+     MODEL_GENERATE=bl-glm-5.2,deepseek-v4-flash
 
 供应商说明：
   - deepseek:  DeepSeek 官方 API（文档解析/筛选/生成任务用）
   - moonshot:  Moonshot 官方 API
-  - dashscope: 阿里云百炼（预留用于 STT 等非 chat 任务）
+  - dashscope: 阿里云百炼（聚合平台，经 MODEL_ALIASES 别名调用其托管模型）
   - zhipu:     智谱 GLM（保留代码，暂不启用）
 """
 import json
@@ -64,6 +67,35 @@ MODEL_PREFIX_MAP = {
 }
 
 
+# ── 模型别名表：别名 → (provider, 平台真实模型 ID) ──
+# 解决聚合平台前缀撞车：百炼上的 GLM 不能按前缀路由到智谱官方。
+# 任务级配置直接写别名即可，如 MODEL_GENERATE=bl-glm-5.2；
+# 解析优先级：别名 > 显式 provider:model > 前缀推断 > 全局默认。
+# 真实模型 ID 以百炼控制台为准，新增模型在此加一行。
+MODEL_ALIASES = {
+    "bl-glm-5.2": ("dashscope", "glm-5.2"),    # 百炼 GLM-5.2（免费额度 100 万 token，用完即停）
+
+    # ── 百炼 Qwen3.7 系列（免费额度，用于粗筛等批量环节）──
+    "bl-qwen3.7-flash":           ("dashscope", "qwen3.7-flash"),
+    "bl-qwen3.7-flash-2026-07-15": ("dashscope", "qwen3.7-flash-2026-07-15"),
+    "bl-qwen3.7-plus":            ("dashscope", "qwen3.7-plus"),
+    "bl-qwen3.7-plus-2026-05-26": ("dashscope", "qwen3.7-plus-2026-05-26"),
+    "bl-qwen3.7-max":             ("dashscope", "qwen3.7-max"),
+    "bl-qwen3.7-max-preview":     ("dashscope", "qwen3.7-max-preview"),
+    "bl-qwen3.7-max-2026-05-17":  ("dashscope", "qwen3.7-max-2026-05-17"),
+    "bl-qwen3.7-max-2026-05-20":  ("dashscope", "qwen3.7-max-2026-05-20"),
+    "bl-qwen3.7-max-2026-06-08":  ("dashscope", "qwen3.7-max-2026-06-08"),
+}
+
+
+class QuotaExhaustedError(RuntimeError):
+    """免费额度用尽（百炼 403 AllocationQuota.FreeTierOnly），触发降级链切换。"""
+
+
+# 判定 403 是"配额用尽"而非"权限不足"：只看响应体里的错误码
+QUOTA_EXHAUSTED_MARKERS = ("AllocationQuota.FreeTierOnly", "AllocationQuota")
+
+
 def _infer_provider(model_name: str) -> str:
     """根据模型名前缀推断供应商。"""
     for prefix, provider in MODEL_PREFIX_MAP.items():
@@ -72,16 +104,31 @@ def _infer_provider(model_name: str) -> str:
     return config.LLM_PROVIDER
 
 
-def _resolve_model(task: str = "") -> tuple[str, str]:
-    """解析当前任务该用哪个供应商和模型。
+def _resolve_one(spec: str) -> tuple[str, str]:
+    """解析单条模型规格：别名 / 显式 provider:model / 前缀推断。"""
+    spec = spec.strip()
+    if spec in MODEL_ALIASES:
+        # 别名：bl-glm-5.2 → (dashscope, glm-5.2)
+        return MODEL_ALIASES[spec]
+    if ":" in spec:
+        # 显式指定供应商：deepseek:deepseek-v4-pro
+        provider, model = spec.split(":", 1)
+        return provider.strip(), model.strip()
+    # 只写模型名：deepseek-v4-pro → 自动推断供应商
+    return _infer_provider(spec), spec
 
-    优先级：
-      1. 任务级环境变量（如 MODEL_SCREEN=deepseek:deepseek-v4-pro 或 MODEL_SCREEN=deepseek-v4-pro）
-      2. 根据模型名前缀自动推断供应商
-      3. 全局 LLM_PROVIDER + MODEL_NAME
-      4. 默认值 deepseek + deepseek-v4-flash
 
-    返回：(provider, model_name)
+def _resolve_candidates(task: str = "") -> list[tuple[str, str]]:
+    """解析任务的候选模型链（降级链）。
+
+    任务级环境变量支持逗号串链，按序降级：
+      MODEL_GENERATE=bl-glm-5.2,deepseek-v4-flash
+      → 先试百炼 GLM-5.2，免费额度耗尽（403 AllocationQuota）自动落回 DeepSeek
+
+    每条规格的解析优先级：别名 > 显式 provider:model > 前缀推断。
+    空则走全局 LLM_PROVIDER + MODEL_NAME 单候选。
+
+    返回：[(provider, model_name), ...] 按尝试顺序排列
     """
     task_env = {
         "screen": config.MODEL_SCREEN,
@@ -92,17 +139,10 @@ def _resolve_model(task: str = "") -> tuple[str, str]:
         "cluster": config.MODEL_CLUSTER,
     }.get(task, "")
 
-    if task_env:
-        if ":" in task_env:
-            # 显式指定供应商：deepseek:deepseek-v4-pro
-            provider, model = task_env.split(":", 1)
-            return provider.strip(), model.strip()
-        else:
-            # 只写模型名：deepseek-v4-pro → 自动推断供应商
-            return _infer_provider(task_env), task_env.strip()
-
-    # 走全局默认
-    return config.LLM_PROVIDER, config.MODEL_NAME
+    specs = [s for s in task_env.split(",") if s.strip()]
+    if not specs:
+        return [(config.LLM_PROVIDER, config.MODEL_NAME)]
+    return [_resolve_one(s) for s in specs]
 
 
 def chat_completion(
@@ -111,9 +151,13 @@ def chat_completion(
     task: str = "",
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
-    timeout: int = 120,
+    timeout: int = 150,
 ) -> str:
     """调用大模型，返回文本内容。
+
+    支持候选链降级：任务级配置可逗号串多个候选（如
+    MODEL_GENERATE=bl-glm-5.2,deepseek-v4-flash），免费额度用尽
+    （百炼 403 AllocationQuota）时自动切换下一候选；链耗尽则报错。
 
     Args:
         system: System Prompt
@@ -126,7 +170,38 @@ def chat_completion(
     Returns:
         模型返回的文本内容
     """
-    provider, model_name = _resolve_model(task)
+    candidates = _resolve_candidates(task)
+
+    for idx, (provider, model_name) in enumerate(candidates):
+        try:
+            return _chat_once(provider, model_name, system, user,
+                              task, temperature, max_tokens, timeout)
+        except QuotaExhaustedError:
+            if idx < len(candidates) - 1:
+                nxt_p, nxt_m = candidates[idx + 1]
+                print(f"  ⚠️ {provider}/{model_name} 免费额度用尽（403），降级到 {nxt_p}/{nxt_m}")
+                continue
+            raise RuntimeError(
+                f"候选链已全部耗尽（{[f'{p}/{m}' for p, m in candidates]}），最后一环同样配额不足"
+            )
+    raise RuntimeError("候选链为空")  # 不可达：_resolve_candidates 至少返回 1 个候选
+
+
+def _chat_once(
+    provider: str,
+    model_name: str,
+    system: str,
+    user: str,
+    task: str = "",
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+    timeout: int = 150,
+) -> str:
+    """对单一 (provider, model) 发起调用，含瞬时故障重试。
+
+    配额用尽（403 AllocationQuota）抛 QuotaExhaustedError，交给外层候选链降级；
+    其他错误语义与原 chat_completion 一致。
+    """
     cfg = PROVIDERS.get(provider)
 
     if not cfg:
@@ -202,6 +277,10 @@ def chat_completion(
         # 不可恢复错误：立即失败，不重试
         if resp.status_code == 401:
             raise RuntimeError(f"LLM API 认证失败（401）: 请检查 {provider.upper()}_API_KEY 是否正确")
+        # 免费额度用尽：抛出降级信号，交给外层候选链（原地重试无意义）。
+        # 只对响应体含 AllocationQuota 的 403 降级，其他 403（权限问题）照常报错
+        if resp.status_code == 403 and any(m in resp.text for m in QUOTA_EXHAUSTED_MARKERS):
+            raise QuotaExhaustedError(f"{provider}/{model_name}: {resp.text[:200]}")
         if resp.status_code in RETRYABLE_STATUS:
             last_err = RuntimeError(f"LLM API 瞬时错误（{resp.status_code}）: {resp.text[:200]}")
             continue
