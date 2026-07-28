@@ -253,6 +253,20 @@ def _chat_once(
         elif effort == "none":
             payload["thinking"] = {"type": "disabled"}
 
+    # 百炼（dashscope）思考模式控制：GLM-5.2 / Qwen3.7 等混合思考模型平台默认开思考
+    # （思维链按输出 token 计费且挤占 max_tokens 预算），与 DeepSeek 同哲学——
+    # 批量粗活（screen/dedup/resonance/cluster）默认关闭，质量任务（rank/generate）留平台默认；
+    # 可用 DASHSCOPE_ENABLE_THINKING_<TASK> 按任务覆盖，全局 DASHSCOPE_ENABLE_THINKING 兜底。
+    # enable_thinking 非 OpenAI 标准参数，但裸 HTTP POST 直接放 payload 顶层即可（同 curl 示例）。
+    if provider == "dashscope":
+        task_flag = os.getenv(f"DASHSCOPE_ENABLE_THINKING_{task.upper()}", "") if task else ""
+        flag = (task_flag or config.DASHSCOPE_ENABLE_THINKING
+                or ("false" if task in ("screen", "dedup", "resonance", "cluster") else "")).lower()
+        if flag == "false":
+            payload["enable_thinking"] = False
+        elif flag == "true":
+            payload["enable_thinking"] = True
+
     if config.DEBUG:
         print(f"  [DEBUG] LLM call: provider={provider}, model={model_name}, task={task}, input_chars={len(user)}")
 

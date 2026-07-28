@@ -67,6 +67,11 @@ MODEL_RESONANCE = os.getenv("MODEL_RESONANCE", "deepseek-v4-pro")   # 共振精�
 # DeepSeek V4 思考模式控制：默认不开启（disabled），可设为 high/max 开启
 DEEPSEEK_REASONING_EFFORT = os.getenv("DEEPSEEK_REASONING_EFFORT", "").lower()
 
+# 百炼（dashscope）思考模式控制：GLM-5.2 / Qwen3.7 等混合思考模型平台默认开思考，
+# 思维链按输出 token 计费并挤占 max_tokens 预算。批量任务代码内默认关闭；
+# 此变量作全局覆盖（true/false），任务级覆盖用 DASHSCOPE_ENABLE_THINKING_<TASK>
+DASHSCOPE_ENABLE_THINKING = os.getenv("DASHSCOPE_ENABLE_THINKING", "").lower()
+
 # ── 采集 ──
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "12"))
 NVD_RESULTS_PER_PAGE = int(os.getenv("NVD_RESULTS_PER_PAGE", "10"))
