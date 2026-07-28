@@ -173,8 +173,9 @@ class Selector:
     def _parse_llm_array(raw: str) -> Tuple[List[Dict], bool]:
         """解析 LLM 返回的 JSON 数组；失败时逐层降级。
 
-        降级链：整体解析 → 提取配平数组解析（容忍尾部汇总句/围栏）
-        → 逐对象抢救（容忍截断）。返回 (对象列表, 是否走了降级路径)。
+        降级链：整体解析 → 配平数组提取 / 逐对象抢救（容忍截断）
+        / NDJSON 逐行抢救（模型不遵医嘱输出逐行 JSON 对象时），
+        三条降级路径取救回条数最多者。返回 (对象列表, 是否走了降级路径)。
         """
         parsed = safe_json_parse(raw)
         if isinstance(parsed, list):
@@ -186,18 +187,20 @@ class Selector:
             nl = t.find("\n")
             t = t[nl + 1:] if nl != -1 else t.strip("`")
 
+        candidates: List[Dict] = []
+
         # 降级 1：提取配平数组（模型常在数组后附汇总句，整体解析必挂）
         arr = Selector._extract_balanced_array(t)
         if arr:
             try:
                 parsed = json.loads(arr)
                 if isinstance(parsed, list):
-                    print(f"  ⚠️ 整体解析失败，已从围栏/汇总文本中提取数组（{len(parsed)} 条）")
-                    return [r for r in parsed if isinstance(r, dict)], True
+                    candidates = [r for r in parsed if isinstance(r, dict)]
             except json.JSONDecodeError:
                 pass
 
-        # 降级 2：逐对象抢救（容忍尾部被 max_tokens 截断）
+        # 降级 2：逐对象抢救（容忍尾部被 max_tokens 截断；锚定 '['，
+        # 对无数组包裹的输出必然得 0 条，由降级 3 兜底）
         objs: List[Dict] = []
         start = t.find("[")
         if start != -1:
@@ -226,11 +229,29 @@ class Selector:
                         except json.JSONDecodeError:
                             pass
                         obj_start = None
+        if len(objs) > len(candidates):
+            candidates = objs
 
-        print(f"  ⚠️ 整体 JSON 解析失败，抢救出 {len(objs)} 条完整记录")
+        # 降级 3：NDJSON 逐行抢救（部分模型如 qwen 输出逐行 JSON 对象、
+        # 无数组包裹；截断/残缺的最后一行 json.loads 失败自然跳过）
+        ndjson_objs: List[Dict] = []
+        for line in t.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict):
+                ndjson_objs.append(obj)
+        if len(ndjson_objs) > len(candidates):
+            candidates = ndjson_objs
+
+        print(f"  ⚠️ 整体 JSON 解析失败，抢救出 {len(candidates)} 条完整记录")
         print(f"     响应头: {raw[:150]!r}")
         print(f"     响应尾: {raw[-150:]!r}")
-        return objs, True
+        return candidates, True
 
     # ── 启发式兜底（LLM 整批失败时） ──
 
